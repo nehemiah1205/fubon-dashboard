@@ -76,7 +76,7 @@ if has_fyc or has_team or has_kpi:
     if has_fyc:
         col_m, col_y = st.columns(2)
         with col_m:
-            st.markdown("### 📊 當月 FYC 達成進度")
+            st.markdown("### 📊 當月 FYC 核實進度")
             c1, c2, c3 = st.columns(3)
             c1.metric("當月目標", f"{month_target:,.2f} 萬")
             c2.metric("總核實 FYC", f"{month_actual:,.2f} 萬")
@@ -84,7 +84,7 @@ if has_fyc or has_team or has_kpi:
             st.progress(min(month_actual / month_target, 1.0) if month_target > 0 else 0)
 
         with col_y:
-            st.markdown("### 🏆 累計 FYC 達成進度")
+            st.markdown("### 🏆 年度累計 FYC 進度")
             c4, c5, c6 = st.columns(3)
             c4.metric("累計目標", f"{year_target:,.2f} 萬")
             c5.metric("累計核實 FYC", f"{year_actual:,.2f} 萬")
