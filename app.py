@@ -65,7 +65,7 @@ if has_fyc or has_team or has_kpi:
     st.success("✅ 戰情資料已自動更新至最新版！")
     
     if has_kpi:
-        st.markdown("### 🎯 單位活動率與關鍵指標")
+        st.markdown("### 🎯 單位關鍵指標")
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
         k2.metric("舉績率", f"{ju_rate * 100:.2f}%")
@@ -96,7 +96,7 @@ if has_fyc or has_team or has_kpi:
         st.divider()
 
     if has_team:
-        st.markdown("### 👥 團隊夥伴 FYC 貢獻排行榜")
+        st.markdown("### 👥 團隊夥伴 FYC 核實排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
             st.bar_chart(chart_data.set_index('夥伴姓名')['總核實FYC'])
