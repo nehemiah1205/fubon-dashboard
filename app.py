@@ -4,7 +4,7 @@ import os
 
 # 網頁基本設定
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
-st.title("🚀 竹耀通訊處戰情儀表板")
+st.title("🚀 竹耀戰情儀表板")
 
 # 設定要自動讀取的檔案名稱
 file_fyc = "data_fyc.xlsx"
