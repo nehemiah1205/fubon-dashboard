@@ -127,7 +127,7 @@ if has_fyc or has_team or has_kpi or has_daily:
     
     # 🎯 模組 1: 單位活動率與排名
     if has_kpi:
-        st.markdown("### 🎯 單位活動率與關鍵指標")
+        st.markdown("### 🎯 單位關鍵指標")
         
         # 💡 升級：擴充成 5 個區塊，將排名排在第一位，成為精神指標！
         k1, k2, k3, k4, k5 = st.columns(5)
@@ -169,7 +169,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
-        st.markdown("### 📊 年度核實進度總覽 (最終戰果)")
+        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
@@ -188,7 +188,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 👥 模組 4: 個人核實業績排行榜 (維持垂直長條圖，由高到低排序)
     if has_team:
-        st.markdown("### 👥 團隊夥伴年度核實貢獻排行榜")
+        st.markdown("### 👥 上月核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
             # 這裡設定 X 軸為姓名，Y 軸為業績，就會呈現垂直長條圖且由大到小排序
