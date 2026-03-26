@@ -172,7 +172,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.divider()
 
     if has_team:
-        st.markdown("### 👥 團隊夥伴年度核實貢獻排行榜")
+        st.markdown("### 👥 上月核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
             st.bar_chart(chart_data.set_index('夥伴姓名')['總核實FYC'])
