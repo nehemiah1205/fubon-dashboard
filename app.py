@@ -8,7 +8,7 @@ import altair as alt  # 💡 新增進階繪圖引擎
 # 網頁基本設定
 # ==========================================
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
-st.title("🚀 竹耀通訊處戰情儀表板")
+st.title("🚀 竹耀戰情儀表板")
 
 # 設定要自動讀取的檔案名稱
 file_fyc = "data_fyc.xlsx"
@@ -131,7 +131,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 🥇 模組 2: 每日與累計受理英雄榜
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理動能英雄榜</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
@@ -160,7 +160,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
-        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
+        st.markdown("### 📊 上月核實進度總覽")
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
