@@ -120,7 +120,7 @@ if has_fyc or has_team or has_kpi or has_daily:
     
     # 🎯 模組 1: 單位活動率與排名
     if has_kpi:
-        st.markdown("### 🎯 單位活動率與關鍵指標")
+        st.markdown("### 🎯 竹耀關鍵指標")
         k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("🏆 通訊處排名", f"第 {fyc_rank} 名")
         k2.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
@@ -160,7 +160,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
-        st.markdown("### 📊 年度核實進度總覽 (最終戰果)")
+        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
@@ -179,7 +179,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 👥 模組 4: 個人核實業績排行榜 (進階 Altair 圖表)
     if has_team:
-        st.markdown("### 👥 團隊夥伴年度核實貢獻排行榜")
+        st.markdown("### 👥 上月核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
             # 💡 終極解法：呼叫 Altair 繪圖引擎
