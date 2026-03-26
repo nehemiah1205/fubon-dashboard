@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
+import altair as alt  # 💡 新增進階繪圖引擎
 
 # ==========================================
 # 網頁基本設定
@@ -16,12 +17,11 @@ file_kpi = "data_kpi.xlsm"
 has_fyc, has_team, has_kpi, has_daily = False, False, False, False
 hero_daily_list, hero_accum_list = [], []
 
-# 🛠️ 圖片轉碼器：把圖片轉成雲端能讀懂的 Base64 代碼 (解決照片出不來的問題)
+# 🛠️ 圖片轉碼器：把圖片轉成雲端能讀懂的 Base64 代碼
 def get_image_base64(image_path):
     try:
         with open(image_path, "rb") as img_file:
             encoded_string = base64.b64encode(img_file.read()).decode()
-            # 判斷是 png 還是 jpg 以提供正確的標籤
             ext = "jpeg" if image_path.lower().endswith(".jpg") else "png"
             return f"data:image/{ext};base64,{encoded_string}"
     except Exception:
@@ -57,26 +57,21 @@ if os.path.exists(file_fyc):
 # 模組 B：自動讀取 KPI 與 受理業績報表 (每日動能)
 # ==========================================
 if os.path.exists(file_kpi):
-    # 1. 抓取關鍵指標 KPI 與排名
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
         mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157')
         kpi_row = df_kpi[mask]
         if not kpi_row.empty:
             kdata = kpi_row.iloc[0]
-            
-            # 💡 升級：抓取 A 欄 (Index 0) 的通訊處排名
             try:
                 fyc_rank = int(float(kdata.iloc[0]))
             except:
                 fyc_rank = "-"
-                
             fyc_rate, ju_rate, shi_rate, zhuang_rate = float(kdata.iloc[5]), float(kdata.iloc[13]), float(kdata.iloc[21]), float(kdata.iloc[29])
             has_kpi = True
-    except Exception as e:
-        pass # 隱藏錯誤訊息，保持畫面乾淨
+    except Exception:
+        pass 
 
-    # 2. 抓取每日/累計受理排行
     try:
         df_daily = pd.read_excel(file_kpi, sheet_name="TEAM (分隊)", engine='openpyxl')
         team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157')
@@ -98,8 +93,6 @@ if os.path.exists(file_kpi):
                 result = []
                 for i, (_, row) in enumerate(df_top.iterrows()):
                     name = str(row.iloc[2])
-                    
-                    # 檢查並將照片轉碼
                     img_src = "https://w7.pngwing.com/pngs/129/292/png-transparent-computer-icons-user-profile-male-avatar-avatar-heroes-human-male.png"
                     if os.path.exists(f"{name}.png"):
                         img_src = get_image_base64(f"{name}.png")
@@ -116,7 +109,7 @@ if os.path.exists(file_kpi):
             hero_accum_list = build_hero_list(accum_top3)
             has_daily = True
 
-    except Exception as e:
+    except Exception:
         pass
 
 # ==========================================
@@ -127,9 +120,7 @@ if has_fyc or has_team or has_kpi or has_daily:
     
     # 🎯 模組 1: 單位活動率與排名
     if has_kpi:
-        st.markdown("### 🎯 單位關鍵指標")
-        
-        # 💡 升級：擴充成 5 個區塊，將排名排在第一位，成為精神指標！
+        st.markdown("### 🎯 單位活動率與關鍵指標")
         k1, k2, k3, k4, k5 = st.columns(5)
         k1.metric("🏆 通訊處排名", f"第 {fyc_rank} 名")
         k2.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
@@ -169,7 +160,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
-        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
+        st.markdown("### 📊 年度核實進度總覽 (最終戰果)")
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
@@ -186,13 +177,22 @@ if has_fyc or has_team or has_kpi or has_daily:
             st.progress(min(year_actual / year_target, 1.0) if year_target > 0 else 0)
         st.divider()
 
-    # 👥 模組 4: 個人核實業績排行榜 (維持垂直長條圖，由高到低排序)
+    # 👥 模組 4: 個人核實業績排行榜 (進階 Altair 圖表)
     if has_team:
-        st.markdown("### 👥 上月核實貢獻排行榜")
+        st.markdown("### 👥 團隊夥伴年度核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
-            # 這裡設定 X 軸為姓名，Y 軸為業績，就會呈現垂直長條圖且由大到小排序
-            st.bar_chart(chart_data, x='夥伴姓名', y='總核實FYC')
+            # 💡 終極解法：呼叫 Altair 繪圖引擎
+            # 1. sort='-y'：強制依照 Y 軸數值由大到小排序
+            # 2. labelAngle=0：強制讓底下的名字站直 (0度角)，不要橫躺
+            chart = alt.Chart(chart_data).mark_bar(color='#1a73e8').encode(
+                x=alt.X('夥伴姓名', sort='-y', axis=alt.Axis(labelAngle=0)), 
+                y=alt.Y('總核實FYC', title='總核實FYC'),
+                tooltip=['夥伴姓名', '職稱', '總核實FYC']
+            ).properties(height=400)
+            
+            st.altair_chart(chart, use_container_width=True)
+            
         with col_table:
             st.dataframe(chart_data, hide_index=True, use_container_width=True)
 else:
