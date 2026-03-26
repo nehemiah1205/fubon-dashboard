@@ -6,7 +6,7 @@ import os
 # 網頁基本設定
 # ==========================================
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
-st.title("🚀 竹耀戰情儀表板")
+st.title("🚀 竹耀通訊處戰情儀表板")
 
 # 設定要自動讀取的檔案名稱
 file_fyc = "data_fyc.xlsx"
@@ -113,7 +113,7 @@ if has_fyc or has_team or has_kpi or has_daily:
     
     # 🎯 模組 1: 單位活動率
     if has_kpi:
-        st.markdown("### 🎯 竹耀關鍵指標")
+        st.markdown("### 🎯 單位活動率與關鍵指標")
         k1, k2, k3, k4 = st.columns(4)
         k1.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
         k2.metric("舉績率", f"{ju_rate * 100:.2f}%")
