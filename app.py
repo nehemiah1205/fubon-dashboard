@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
-import altair as alt  # 💡 新增進階繪圖引擎
+import altair as alt
 
 # ==========================================
 # 網頁基本設定
@@ -57,21 +57,35 @@ if os.path.exists(file_fyc):
 # 模組 B：自動讀取 KPI 與 受理業績報表 (每日動能)
 # ==========================================
 if os.path.exists(file_kpi):
+    # 1. 抓取關鍵指標 KPI、排名與單位受理業績
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
         mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157')
         kpi_row = df_kpi[mask]
         if not kpi_row.empty:
             kdata = kpi_row.iloc[0]
+            
+            # 抓取排名
             try:
                 fyc_rank = int(float(kdata.iloc[0]))
             except:
                 fyc_rank = "-"
-            fyc_rate, ju_rate, shi_rate, zhuang_rate = float(kdata.iloc[5]), float(kdata.iloc[13]), float(kdata.iloc[21]), float(kdata.iloc[29])
+                
+            # 抓取單位單日與累計受理 (D欄=Index 3, E欄=Index 4)
+            unit_daily_fyc = float(kdata.iloc[3]) if pd.notnull(kdata.iloc[3]) else 0.0
+            unit_accum_fyc = float(kdata.iloc[4]) if pd.notnull(kdata.iloc[4]) else 0.0
+            
+            # 抓取各項活動率
+            fyc_rate = float(kdata.iloc[5]) if pd.notnull(kdata.iloc[5]) else 0.0
+            ju_rate = float(kdata.iloc[13]) if pd.notnull(kdata.iloc[13]) else 0.0
+            shi_rate = float(kdata.iloc[21]) if pd.notnull(kdata.iloc[21]) else 0.0
+            zhuang_rate = float(kdata.iloc[29]) if pd.notnull(kdata.iloc[29]) else 0.0
+            
             has_kpi = True
     except Exception:
         pass 
 
+    # 2. 抓取每日/累計受理排行
     try:
         df_daily = pd.read_excel(file_kpi, sheet_name="TEAM (分隊)", engine='openpyxl')
         team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157')
@@ -118,20 +132,30 @@ if os.path.exists(file_kpi):
 if has_fyc or has_team or has_kpi or has_daily:
     st.success("✅ 戰情資料已自動更新至最新版！")
     
-    # 🎯 模組 1: 單位活動率與排名
+    # 🎯 模組 1: 單位關鍵指標 (改版為兩列顯示)
     if has_kpi:
-        st.markdown("### 🎯 竹耀關鍵指標")
-        k1, k2, k3, k4, k5 = st.columns(5)
-        k1.metric("🏆 通訊處排名", f"第 {fyc_rank} 名")
-        k2.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
-        k3.metric("舉績率", f"{ju_rate * 100:.2f}%")
-        k4.metric("實動率", f"{shi_rate * 100:.2f}%")
-        k5.metric("壯實人力率", f"{zhuang_rate * 100:.2f}%")
+        st.markdown("### 🎯 單位戰力與關鍵指標")
+        
+        # 第一列：排名與業績動能 (分成 4 格)
+        r1_col1, r1_col2, r1_col3, r1_col4 = st.columns(4)
+        r1_col1.metric("🏆 通訊處排名", f"第 {fyc_rank} 名")
+        r1_col2.metric("單日受理 FYC", f"{unit_daily_fyc:,.0f}")
+        r1_col3.metric("累計受理 FYC", f"{unit_accum_fyc:,.0f}")
+        r1_col4.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
+        
+        st.markdown("<br>", unsafe_allow_html=True) # 稍微增加兩列之間的留白
+        
+        # 第二列：各項活動率 (分成 3 格)
+        r2_col1, r2_col2, r2_col3 = st.columns(3)
+        r2_col1.metric("舉績率", f"{ju_rate * 100:.2f}%")
+        r2_col2.metric("實動率", f"{shi_rate * 100:.2f}%")
+        r2_col3.metric("壯實人力率", f"{zhuang_rate * 100:.2f}%")
+        
         st.divider()
 
     # 🥇 模組 2: 每日與累計受理英雄榜
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理英雄榜</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理動能英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
@@ -160,7 +184,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
-        st.markdown("### 📊 上月核實進度總覽")
+        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
@@ -179,12 +203,10 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 👥 模組 4: 個人核實業績排行榜 (進階 Altair 圖表)
     if has_team:
-        st.markdown("### 👥 上月核實貢獻排行榜")
+        st.markdown("### 👥 團隊夥伴年度核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
-            # 💡 終極解法：呼叫 Altair 繪圖引擎
-            # 1. sort='-y'：強制依照 Y 軸數值由大到小排序
-            # 2. labelAngle=0：強制讓底下的名字站直 (0度角)，不要橫躺
+            # Altair 進階繪圖，強制 Y 軸排序且文字直立
             chart = alt.Chart(chart_data).mark_bar(color='#1a73e8').encode(
                 x=alt.X('夥伴姓名', sort='-y', axis=alt.Axis(labelAngle=0)), 
                 y=alt.Y('總核實FYC', title='總核實FYC'),
