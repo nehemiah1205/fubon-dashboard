@@ -155,7 +155,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 🥇 模組 2: 每日與累計受理英雄榜
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理動能英雄榜</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
@@ -184,7 +184,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
-        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
+        st.markdown("### 📊 上月核實進度總覽")
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
@@ -203,7 +203,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 👥 模組 4: 個人核實業績排行榜 (進階 Altair 圖表)
     if has_team:
-        st.markdown("### 👥 團隊夥伴年度核實貢獻排行榜")
+        st.markdown("### 👥 上月核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
             # Altair 進階繪圖，強制 Y 軸排序且文字直立
