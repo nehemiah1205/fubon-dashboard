@@ -132,20 +132,34 @@ if os.path.exists(file_kpi):
 if has_fyc or has_team or has_kpi or has_daily:
     st.success("✅ 戰情資料已自動更新至最新版！")
     
-    # 🎯 模組 1: 單位關鍵指標 (改版為兩列顯示)
+    # # 🎯 模組 1: 單位關鍵指標 (改版為兩列顯示 + 粗體醒目戰情卡)
     if has_kpi:
         st.markdown("### 🎯 單位戰力與關鍵指標")
         
-        # 第一列：排名與業績動能 (分成 4 格)
+        # 💡 新增：自訂醒目戰情卡片的 HTML 樣式
+        def big_metric_card(title, value, color):
+            return f"""
+            <div style="text-align: center; border: 2px solid #eee; border-radius: 10px; padding: 20px; background-color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+                <p style="font-size: 1.2em; color: #555; margin-bottom: 5px; font-weight: bold;">{title}</p>
+                <h1 style="color: {color}; font-size: 2.8em; margin: 0; font-weight: 900; letter-spacing: 1px;">{value}</h1>
+            </div>
+            """
+
+        # 第一列：排名與業績動能 (分成 4 格，套用醒目卡片)
         r1_col1, r1_col2, r1_col3, r1_col4 = st.columns(4)
-        r1_col1.metric("🏆 通訊處排名", f"第 {fyc_rank} 名")
-        r1_col2.metric("單日受理 FYC", f"{unit_daily_fyc:,.0f}")
-        r1_col3.metric("累計受理 FYC", f"{unit_accum_fyc:,.0f}")
-        r1_col4.metric("FYC 達成率", f"{fyc_rate * 100:.2f}%")
+        
+        with r1_col1:
+            st.markdown(big_metric_card("🏆 通訊處排名", f"第 {fyc_rank} 名", "#ffaa00"), unsafe_allow_html=True) # 榮譽金
+        with r1_col2:
+            st.markdown(big_metric_card("🔥 單日受理 FYC", f"{unit_daily_fyc:,.0f}", "#1a73e8"), unsafe_allow_html=True) # 動能藍
+        with r1_col3:
+            st.markdown(big_metric_card("📈 累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#d93025"), unsafe_allow_html=True) # 霸氣紅
+        with r1_col4:
+            st.markdown(big_metric_card("🎯 FYC 達成率", f"{fyc_rate * 100:.2f}%", "#34a853"), unsafe_allow_html=True) # 達標綠
         
         st.markdown("<br>", unsafe_allow_html=True) # 稍微增加兩列之間的留白
         
-        # 第二列：各項活動率 (分成 3 格)
+        # 第二列：各項活動率 (分成 3 格，維持原本風格作為層次對比)
         r2_col1, r2_col2, r2_col3 = st.columns(3)
         r2_col1.metric("舉績率", f"{ju_rate * 100:.2f}%")
         r2_col2.metric("實動率", f"{shi_rate * 100:.2f}%")
