@@ -38,7 +38,7 @@ def get_image_base64(image_path):
 def open_excel(file_path, password):
     """
     嘗試直接開啟（未加密），若失敗則解密。
-    回傳可供 pd.read_excel 使用的 BytesIO。
+    回傳原始 bytes，之後每次用 io.BytesIO() 包。
     """
     with open(file_path, "rb") as f:
         file_bytes = f.read()
@@ -47,7 +47,7 @@ def open_excel(file_path, password):
     try:
         buf = io.BytesIO(file_bytes)
         pd.read_excel(buf, sheet_name=0, nrows=1, engine='openpyxl')
-        return file_bytes  # 回傳原始 bytes，之後每次用 io.BytesIO() 包
+        return file_bytes
     except Exception:
         pass
 
@@ -59,8 +59,7 @@ def open_excel(file_path, password):
         decrypted = io.BytesIO()
         office_file.decrypt(decrypted)
         decrypted.seek(0)
-        raw = decrypted.read()
-        return raw  # 回傳解密後的 bytes
+        return decrypted.read()
     except Exception as e:
         st.error(f"❌ 解密 {os.path.basename(file_path)} 失敗：{e}")
         return None
@@ -133,8 +132,10 @@ if os.path.exists(file_kpi):
                 individuals.iloc[:, 2] = individuals.iloc[:, 2].astype(str).str.replace('　', '').str.strip()
                 individuals.iloc[:, 5] = pd.to_numeric(individuals.iloc[:, 5], errors='coerce').fillna(0)
                 individuals.iloc[:, 7] = pd.to_numeric(individuals.iloc[:, 7], errors='coerce').fillna(0)
-                daily_top3 = individuals.sort_values(by=individuals.columns[5], ascending=False).head(3)
-                accum_top3 = individuals.sort_values(by=individuals.columns[7], ascending=False).head(3)
+
+                # ✅ 只取業績 > 0 的人，避免無業績者佔據銀牌銅牌
+                daily_top3 = individuals[individuals.iloc[:, 5] > 0].sort_values(by=individuals.columns[5], ascending=False).head(3)
+                accum_top3 = individuals[individuals.iloc[:, 7] > 0].sort_values(by=individuals.columns[7], ascending=False).head(3)
 
                 def build_hero_list(df_top, is_daily):
                     medal_colors = ["🥇 金牌", "🥈 銀牌", "🥉 銅牌"]
@@ -198,22 +199,24 @@ if has_fyc or has_team or has_kpi or has_daily:
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
 
         def render_heroes(hero_list, label):
-            h_cols = st.columns(3)
+            if not hero_list:
+                st.info("今日尚無人報件")
+                return
+            h_cols = st.columns(len(hero_list))
             for i, col in enumerate(h_cols):
-                if i < len(hero_list):
-                    hero = hero_list[i]
-                    with col:
-                        st.markdown(f"""
-                        <div style="text-align: center; border: 2px solid #ddd; border-radius: 10px; padding: 15px; background-color: #f9f9f9;">
-                            <h3 style="color: #333;">{hero['rank']}</h3>
-                            <img src="{hero['photo_src']}" width="150" height="150" style="border-radius: 50%; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-                            <h2 style="margin-top: 15px; color: #1a73e8;">{hero['name']}</h2>
-                            <p style="color: #666; margin-top: -10px;">({hero['title']})</p>
-                            <hr>
-                            <p style="font-size: 1.2em; color: #333;">{label}</p>
-                            <h1 style="color: #d93025; font-size: 2.5em; margin-top: -15px;">{hero['value']:,.0f}</h1>
-                        </div>
-                        """, unsafe_allow_html=True)
+                hero = hero_list[i]
+                with col:
+                    st.markdown(f"""
+                    <div style="text-align: center; border: 2px solid #ddd; border-radius: 10px; padding: 15px; background-color: #f9f9f9;">
+                        <h3 style="color: #333;">{hero['rank']}</h3>
+                        <img src="{hero['photo_src']}" width="150" height="150" style="border-radius: 50%; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                        <h2 style="margin-top: 15px; color: #1a73e8;">{hero['name']}</h2>
+                        <p style="color: #666; margin-top: -10px;">({hero['title']})</p>
+                        <hr>
+                        <p style="font-size: 1.2em; color: #333;">{label}</p>
+                        <h1 style="color: #d93025; font-size: 2.5em; margin-top: -15px;">{hero['value']:,.0f}</h1>
+                    </div>
+                    """, unsafe_allow_html=True)
 
         with tab1:
             render_heroes(hero_daily_list, "今日受理 (FYC)")
