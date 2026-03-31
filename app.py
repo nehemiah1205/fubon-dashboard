@@ -12,9 +12,13 @@ import io
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
 st.title("🚀 竹耀戰情儀表板")
 
+# 設定要自動讀取的檔案名稱（下載後改名成這樣放在同一個資料夾）
+file_fyc = "data_fyc.xlsx"
+file_kpi = "data_kpi.xlsm"
+
 # 🔐 固定密碼（直接改這裡）
-FYC_PASSWORD = "請填入FYC密碼"
-KPI_PASSWORD = "請填入KPI密碼"
+FYC_PASSWORD = "20211"
+KPI_PASSWORD = "2020"
 
 has_fyc, has_team, has_kpi, has_daily = False, False, False, False
 hero_daily_list, hero_accum_list = [], []
@@ -23,7 +27,6 @@ hero_daily_list, hero_accum_list = [], []
 # 🛠️ 工具函式
 # ==========================================
 def get_image_base64(image_path):
-    """圖片轉 Base64"""
     try:
         with open(image_path, "rb") as img_file:
             encoded_string = base64.b64encode(img_file.read()).decode()
@@ -32,8 +35,23 @@ def get_image_base64(image_path):
     except Exception:
         return None
 
-def decrypt_excel(file_bytes, password):
-    """將加密的 Excel bytes 解密後回傳 BytesIO"""
+def open_excel(file_path, password):
+    """
+    嘗試直接開啟（未加密），若失敗則解密。
+    回傳可供 pd.read_excel 使用的 BytesIO。
+    """
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    # 先試未加密
+    try:
+        buf = io.BytesIO(file_bytes)
+        pd.read_excel(buf, sheet_name=0, nrows=1, engine='openpyxl')
+        return file_bytes  # 回傳原始 bytes，之後每次用 io.BytesIO() 包
+    except Exception:
+        pass
+
+    # 有加密，進行解密
     try:
         buf = io.BytesIO(file_bytes)
         office_file = msoffcrypto.OfficeFile(buf)
@@ -41,58 +59,20 @@ def decrypt_excel(file_bytes, password):
         decrypted = io.BytesIO()
         office_file.decrypt(decrypted)
         decrypted.seek(0)
-        return decrypted
+        raw = decrypted.read()
+        return raw  # 回傳解密後的 bytes
     except Exception as e:
-        st.error(f"❌ 解密失敗：{e}，請確認密碼是否正確")
+        st.error(f"❌ 解密 {os.path.basename(file_path)} 失敗：{e}")
         return None
 
-def open_excel(file_bytes, password):
-    """
-    嘗試直接開啟，若失敗則先解密。
-    每次呼叫都回傳一個全新的 BytesIO，可安全地 seek(0) 重複使用。
-    """
-    # 先試未加密
+# ==========================================
+# 模組 A：自動讀取 FYC 核實報表
+# ==========================================
+if os.path.exists(file_fyc):
     try:
-        buf = io.BytesIO(file_bytes)
-        pd.read_excel(buf, sheet_name=0, nrows=1, engine='openpyxl')
-        return io.BytesIO(file_bytes)  # 回傳全新 buffer
-    except Exception:
-        pass
-    # 有加密，解密
-    return decrypt_excel(file_bytes, password)
-
-# ==========================================
-# 📂 側邊欄：上傳檔案
-# ==========================================
-with st.sidebar:
-    st.header("📂 上傳報表檔案")
-    st.caption("收到 Email 附件後，直接在這裡上傳即可更新儀表板")
-
-    uploaded_fyc = st.file_uploader(
-        "上傳 FYC 核實報表 (.xlsx)",
-        type=["xlsx", "xls"],
-        key="fyc"
-    )
-    uploaded_kpi = st.file_uploader(
-        "上傳 KPI 受理報表 (.xlsm)",
-        type=["xlsm", "xlsx", "xls"],
-        key="kpi"
-    )
-
-    st.markdown("---")
-    st.success(f"✅ FYC：{uploaded_fyc.name}") if uploaded_fyc else st.warning("⏳ 尚未上傳 FYC 報表")
-    st.success(f"✅ KPI：{uploaded_kpi.name}") if uploaded_kpi else st.warning("⏳ 尚未上傳 KPI 報表")
-
-# ==========================================
-# 模組 A：讀取 FYC 核實報表
-# ==========================================
-if uploaded_fyc:
-    try:
-        fyc_bytes = uploaded_fyc.read()
-
-        buf1 = open_excel(fyc_bytes, FYC_PASSWORD)
-        if buf1:
-            df_unit = pd.read_excel(buf1, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
+        fyc_bytes = open_excel(file_fyc, FYC_PASSWORD)
+        if fyc_bytes:
+            df_unit = pd.read_excel(io.BytesIO(fyc_bytes), sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
             target_row = df_unit[df_unit[2] == '竹耀']
             if not target_row.empty:
                 data = target_row.iloc[0]
@@ -100,9 +80,7 @@ if uploaded_fyc:
                 year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
                 has_fyc = True
 
-        buf2 = open_excel(fyc_bytes, FYC_PASSWORD)
-        if buf2:
-            df_person = pd.read_excel(buf2, sheet_name="個人排名_FYC", skiprows=5, header=None, engine='openpyxl')
+            df_person = pd.read_excel(io.BytesIO(fyc_bytes), sheet_name="個人排名_FYC", skiprows=5, header=None, engine='openpyxl')
             team_data = df_person[df_person[3] == 'HC157'].copy()
             if not team_data.empty:
                 chart_data = pd.DataFrame({
@@ -113,18 +91,16 @@ if uploaded_fyc:
                 has_team = True
 
     except Exception as e:
-        st.error(f"讀取 FYC 報表發生錯誤：{e}")
+        st.error(f"讀取 {file_fyc} 發生錯誤：{e}")
 
 # ==========================================
-# 模組 B：讀取 KPI 與受理業績報表
+# 模組 B：自動讀取 KPI 與受理業績報表
 # ==========================================
-if uploaded_kpi:
+if os.path.exists(file_kpi):
     try:
-        kpi_bytes = uploaded_kpi.read()
-
-        buf3 = open_excel(kpi_bytes, KPI_PASSWORD)
-        if buf3:
-            df_kpi = pd.read_excel(buf3, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
+        kpi_bytes = open_excel(file_kpi, KPI_PASSWORD)
+        if kpi_bytes:
+            df_kpi = pd.read_excel(io.BytesIO(kpi_bytes), sheet_name="關鍵指標 (分隊)", engine='openpyxl')
             mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157')
             kpi_row = df_kpi[mask]
             if not kpi_row.empty:
@@ -144,9 +120,8 @@ if uploaded_kpi:
         pass
 
     try:
-        buf4 = open_excel(kpi_bytes, KPI_PASSWORD)
-        if buf4:
-            df_daily = pd.read_excel(buf4, sheet_name="TEAM (分隊)", engine='openpyxl')
+        if kpi_bytes:
+            df_daily = pd.read_excel(io.BytesIO(kpi_bytes), sheet_name="TEAM (分隊)", engine='openpyxl')
             team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157')
             df_hc157 = df_daily[team_mask].copy()
             if not df_hc157.empty:
@@ -188,7 +163,7 @@ if uploaded_kpi:
 # 繪製網頁畫面
 # ==========================================
 if has_fyc or has_team or has_kpi or has_daily:
-    st.success("✅ 戰情資料已載入最新版！")
+    st.success("✅ 戰情資料已自動更新至最新版！")
 
     if has_kpi:
         st.markdown("### 🎯 單位戰力與關鍵指標")
@@ -277,4 +252,4 @@ if has_fyc or has_team or has_kpi or has_daily:
             st.dataframe(chart_data, hide_index=True, use_container_width=True)
 
 else:
-    st.info("👈 請先在左側上傳 FYC 與 KPI 報表，儀表板將自動顯示最新資料")
+    st.info("🔄 系統正在等待最新的報表資料...")
