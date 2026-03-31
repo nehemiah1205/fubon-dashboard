@@ -12,10 +12,6 @@ import io
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
 st.title("🚀 竹耀戰情儀表板")
 
-# 設定要自動讀取的檔案名稱
-file_fyc = "data_fyc.xlsx"
-file_kpi = "data_kpi.xlsm"
-
 # 🔐 固定密碼（直接改這裡）
 FYC_PASSWORD = "請填入FYC密碼"
 KPI_PASSWORD = "請填入KPI密碼"
@@ -36,122 +32,67 @@ def get_image_base64(image_path):
     except Exception:
         return None
 
-def decrypt_excel(file_path, password):
-    """將加密的 Excel 解密後回傳可讀取的 BytesIO 物件"""
+def decrypt_excel(file_bytes, password):
+    """將加密的 Excel bytes 解密後回傳 BytesIO"""
     try:
-        with open(file_path, "rb") as f:
-            office_file = msoffcrypto.OfficeFile(f)
-            office_file.load_key(password=password)
-            decrypted = io.BytesIO()
-            office_file.decrypt(decrypted)
-            decrypted.seek(0)
-            return decrypted
+        buf = io.BytesIO(file_bytes)
+        office_file = msoffcrypto.OfficeFile(buf)
+        office_file.load_key(password=password)
+        decrypted = io.BytesIO()
+        office_file.decrypt(decrypted)
+        decrypted.seek(0)
+        return decrypted
     except Exception as e:
-        st.error(f"❌ 解密 {os.path.basename(file_path)} 失敗：{e}，請確認密碼是否正確")
+        st.error(f"❌ 解密失敗：{e}，請確認密碼是否正確")
         return None
 
+def open_excel(file_bytes, password):
+    """
+    嘗試直接開啟，若失敗則先解密。
+    每次呼叫都回傳一個全新的 BytesIO，可安全地 seek(0) 重複使用。
+    """
+    # 先試未加密
+    try:
+        buf = io.BytesIO(file_bytes)
+        pd.read_excel(buf, sheet_name=0, nrows=1, engine='openpyxl')
+        return io.BytesIO(file_bytes)  # 回傳全新 buffer
+    except Exception:
+        pass
+    # 有加密，解密
+    return decrypt_excel(file_bytes, password)
+
 # ==========================================
-# 📬 側邊欄：Exchange 信箱設定 + 更新按鈕
+# 📂 側邊欄：上傳檔案
 # ==========================================
 with st.sidebar:
-    st.header("📬 Email 自動更新設定")
+    st.header("📂 上傳報表檔案")
+    st.caption("收到 Email 附件後，直接在這裡上傳即可更新儀表板")
 
-    exchange_server = st.text_input("Exchange Server 位址", value="mail.yourcompany.com", help="例如：mail.company.com.tw")
-    exchange_user   = st.text_input("帳號（含網域）", value="domain\\username", help="例如：company\\john")
-    exchange_pass   = st.text_input("密碼", type="password")
+    uploaded_fyc = st.file_uploader(
+        "上傳 FYC 核實報表 (.xlsx)",
+        type=["xlsx", "xls"],
+        key="fyc"
+    )
+    uploaded_kpi = st.file_uploader(
+        "上傳 KPI 受理報表 (.xlsm)",
+        type=["xlsm", "xlsx", "xls"],
+        key="kpi"
+    )
 
     st.markdown("---")
-    st.markdown("**FYC 報表信件條件**")
-    fyc_sender  = st.text_input("寄件者 Email（FYC）", value="report@company.com")
-    fyc_subject = st.text_input("主旨關鍵字（FYC）", value="FYC核實報表")
-
-    st.markdown("**KPI 報表信件條件**")
-    kpi_sender  = st.text_input("寄件者 Email（KPI）", value="report@company.com")
-    kpi_subject = st.text_input("主旨關鍵字（KPI）", value="KPI受理報表")
-
-    st.markdown("---")
-
-    if st.button("🔄 立即更新資料", use_container_width=True, type="primary"):
-        if not exchange_pass:
-            st.error("請先輸入密碼！")
-        else:
-            try:
-                from exchangelib import Credentials, Account, DELEGATE, Configuration, FileAttachment
-                from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
-
-                # 若公司憑證未受信任，可取消下行註解跳過 SSL 驗證
-                # BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
-
-                with st.spinner("正在連線 Exchange 信箱..."):
-                    creds  = Credentials(username=exchange_user, password=exchange_pass)
-                    config = Configuration(server=exchange_server, credentials=creds)
-                    account = Account(
-                        primary_smtp_address=exchange_user if "@" in exchange_user else f"{exchange_user.split('\\')[-1]}@{exchange_server}",
-                        config=config,
-                        autodiscover=False,
-                        access_type=DELEGATE
-                    )
-
-                def download_latest_attachment(sender_filter, subject_filter, save_as):
-                    """從收件匣找最新一封符合條件的信，下載第一個 Excel 附件"""
-                    results = account.inbox.filter(subject__contains=subject_filter).order_by('-datetime_received')[:20]
-                    for item in results:
-                        if sender_filter.lower() in str(item.sender.email_address).lower():
-                            for att in item.attachments:
-                                if isinstance(att, FileAttachment) and att.name.endswith(('.xlsx', '.xlsm', '.xls')):
-                                    with open(save_as, 'wb') as f:
-                                        f.write(att.content)
-                                    return True, att.name, str(item.datetime_received)[:16]
-                    return False, None, None
-
-                with st.spinner("下載 FYC 報表中..."):
-                    ok1, name1, time1 = download_latest_attachment(fyc_sender, fyc_subject, file_fyc)
-
-                with st.spinner("下載 KPI 報表中..."):
-                    ok2, name2, time2 = download_latest_attachment(kpi_sender, kpi_subject, file_kpi)
-
-                if ok1:
-                    st.success(f"✅ FYC 報表已更新（{name1}，寄件時間：{time1}）")
-                else:
-                    st.warning("⚠️ 找不到符合條件的 FYC 信件，請確認寄件者/主旨設定")
-
-                if ok2:
-                    st.success(f"✅ KPI 報表已更新（{name2}，寄件時間：{time2}）")
-                else:
-                    st.warning("⚠️ 找不到符合條件的 KPI 信件，請確認寄件者/主旨設定")
-
-                if ok1 or ok2:
-                    st.rerun()
-
-            except ImportError:
-                st.error("❌ 請先安裝套件：python3 -m pip install exchangelib")
-            except Exception as e:
-                st.error(f"❌ 連線失敗：{e}")
-                st.info("💡 常見原因：帳號格式錯誤、密碼錯誤、Server 位址不對、需要跳過 SSL 驗證")
-
-    # 顯示目前檔案狀態
-    st.markdown("---")
-    st.markdown("**📁 目前資料狀態**")
-    import datetime
-    if os.path.exists(file_fyc):
-        mtime = os.path.getmtime(file_fyc)
-        st.caption(f"FYC：{datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')}")
-    else:
-        st.caption("FYC：尚無資料")
-    if os.path.exists(file_kpi):
-        mtime = os.path.getmtime(file_kpi)
-        st.caption(f"KPI：{datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')}")
-    else:
-        st.caption("KPI：尚無資料")
+    st.success(f"✅ FYC：{uploaded_fyc.name}") if uploaded_fyc else st.warning("⏳ 尚未上傳 FYC 報表")
+    st.success(f"✅ KPI：{uploaded_kpi.name}") if uploaded_kpi else st.warning("⏳ 尚未上傳 KPI 報表")
 
 # ==========================================
-# 模組 A：自動讀取 FYC 核實報表
+# 模組 A：讀取 FYC 核實報表
 # ==========================================
-if os.path.exists(file_fyc):
+if uploaded_fyc:
     try:
-        decrypted_fyc = decrypt_excel(file_fyc, FYC_PASSWORD)
-        if decrypted_fyc:
-            df_unit = pd.read_excel(decrypted_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
+        fyc_bytes = uploaded_fyc.read()
+
+        buf1 = open_excel(fyc_bytes, FYC_PASSWORD)
+        if buf1:
+            df_unit = pd.read_excel(buf1, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
             target_row = df_unit[df_unit[2] == '竹耀']
             if not target_row.empty:
                 data = target_row.iloc[0]
@@ -159,9 +100,9 @@ if os.path.exists(file_fyc):
                 year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
                 has_fyc = True
 
-            # 重置 BytesIO 位置再讀第二個工作表
-            decrypted_fyc.seek(0)
-            df_person = pd.read_excel(decrypted_fyc, sheet_name="個人排名_FYC", skiprows=5, header=None, engine='openpyxl')
+        buf2 = open_excel(fyc_bytes, FYC_PASSWORD)
+        if buf2:
+            df_person = pd.read_excel(buf2, sheet_name="個人排名_FYC", skiprows=5, header=None, engine='openpyxl')
             team_data = df_person[df_person[3] == 'HC157'].copy()
             if not team_data.empty:
                 chart_data = pd.DataFrame({
@@ -172,23 +113,25 @@ if os.path.exists(file_fyc):
                 has_team = True
 
     except Exception as e:
-        st.error(f"讀取 {file_fyc} 發生錯誤：{e}")
+        st.error(f"讀取 FYC 報表發生錯誤：{e}")
 
 # ==========================================
-# 模組 B：自動讀取 KPI 與受理業績報表
+# 模組 B：讀取 KPI 與受理業績報表
 # ==========================================
-if os.path.exists(file_kpi):
+if uploaded_kpi:
     try:
-        decrypted_kpi = decrypt_excel(file_kpi, KPI_PASSWORD)
-        if decrypted_kpi:
-            df_kpi = pd.read_excel(decrypted_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
+        kpi_bytes = uploaded_kpi.read()
+
+        buf3 = open_excel(kpi_bytes, KPI_PASSWORD)
+        if buf3:
+            df_kpi = pd.read_excel(buf3, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
             mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157')
             kpi_row = df_kpi[mask]
             if not kpi_row.empty:
                 kdata = kpi_row.iloc[0]
                 try:
                     fyc_rank = int(float(kdata.iloc[0]))
-                except:
+                except Exception:
                     fyc_rank = "-"
                 unit_daily_fyc  = float(kdata.iloc[3])  if pd.notnull(kdata.iloc[3])  else 0.0
                 unit_accum_fyc  = float(kdata.iloc[4])  if pd.notnull(kdata.iloc[4])  else 0.0
@@ -201,14 +144,16 @@ if os.path.exists(file_kpi):
         pass
 
     try:
-        # KPI 檔需要再解密一次給第二個工作表用
-        decrypted_kpi2 = decrypt_excel(file_kpi, KPI_PASSWORD)
-        if decrypted_kpi2:
-            df_daily = pd.read_excel(decrypted_kpi2, sheet_name="TEAM (分隊)", engine='openpyxl')
+        buf4 = open_excel(kpi_bytes, KPI_PASSWORD)
+        if buf4:
+            df_daily = pd.read_excel(buf4, sheet_name="TEAM (分隊)", engine='openpyxl')
             team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157')
             df_hc157 = df_daily[team_mask].copy()
             if not df_hc157.empty:
-                valid_title_mask = pd.to_numeric(df_hc157.iloc[:, 3], errors='coerce').isna() & df_hc157.iloc[:, 3].notna()
+                valid_title_mask = (
+                    pd.to_numeric(df_hc157.iloc[:, 3], errors='coerce').isna()
+                    & df_hc157.iloc[:, 3].notna()
+                )
                 individuals = df_hc157[valid_title_mask].copy()
                 individuals.iloc[:, 2] = individuals.iloc[:, 2].astype(str).str.replace('　', '').str.strip()
                 individuals.iloc[:, 5] = pd.to_numeric(individuals.iloc[:, 5], errors='coerce').fillna(0)
@@ -216,7 +161,7 @@ if os.path.exists(file_kpi):
                 daily_top3 = individuals.sort_values(by=individuals.columns[5], ascending=False).head(3)
                 accum_top3 = individuals.sort_values(by=individuals.columns[7], ascending=False).head(3)
 
-                def build_hero_list(df_top):
+                def build_hero_list(df_top, is_daily):
                     medal_colors = ["🥇 金牌", "🥈 銀牌", "🥉 銅牌"]
                     result = []
                     for i, (_, row) in enumerate(df_top.iterrows()):
@@ -228,12 +173,13 @@ if os.path.exists(file_kpi):
                             img_src = get_image_base64(f"{name}.jpg")
                         result.append({
                             'rank': medal_colors[i], 'name': name, 'title': str(row.iloc[3]),
-                            'photo_src': img_src, 'value': row.iloc[5] if df_top.equals(daily_top3) else row.iloc[7]
+                            'photo_src': img_src,
+                            'value': row.iloc[5] if is_daily else row.iloc[7]
                         })
                     return result
 
-                hero_daily_list = build_hero_list(daily_top3)
-                hero_accum_list = build_hero_list(accum_top3)
+                hero_daily_list = build_hero_list(daily_top3, is_daily=True)
+                hero_accum_list = build_hero_list(accum_top3, is_daily=False)
                 has_daily = True
     except Exception:
         pass
@@ -242,7 +188,7 @@ if os.path.exists(file_kpi):
 # 繪製網頁畫面
 # ==========================================
 if has_fyc or has_team or has_kpi or has_daily:
-    st.success("✅ 戰情資料已自動更新至最新版！")
+    st.success("✅ 戰情資料已載入最新版！")
 
     if has_kpi:
         st.markdown("### 🎯 單位戰力與關鍵指標")
@@ -329,5 +275,6 @@ if has_fyc or has_team or has_kpi or has_daily:
             st.altair_chart(chart, use_container_width=True)
         with col_table:
             st.dataframe(chart_data, hide_index=True, use_container_width=True)
+
 else:
-    st.info("🔄 系統正在等待最新的報表資料，請點選左側「🔄 立即更新資料」按鈕")
+    st.info("👈 請先在左側上傳 FYC 與 KPI 報表，儀表板將自動顯示最新資料")
