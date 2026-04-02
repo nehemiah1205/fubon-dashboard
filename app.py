@@ -80,7 +80,6 @@ if os.path.exists(file_kpi):
             zhuang_rate = float(kdata.iloc[29]) if pd.notnull(kdata.iloc[29]) else 0.0
             has_kpi = True
     except Exception as e:
-        # 💡 偵測雷達開啟：如果讀取失敗，直接在網頁印出錯誤原因
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
 
     # 2. 抓取每日/累計受理排行
@@ -124,10 +123,8 @@ if os.path.exists(file_kpi):
             hero_accum_list = build_hero_list(accum_top3)
             has_daily = True
     except Exception as e:
-        # 💡 偵測雷達開啟：如果讀取失敗，直接在網頁印出錯誤原因
         st.error(f"❌ 讀取 TEAM 英雄榜時發生錯誤：{e}")
 else:
-    # 💡 偵測雷達開啟：如果根本沒上傳檔案
     st.warning(f"⚠️ 雲端找不到檔案：{file_kpi} (請確認是否已上傳到 GitHub)")
 
 # ==========================================
@@ -168,7 +165,8 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 🥇 模組 2: 每日與累計受理英雄榜
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理英雄榜</h2>", unsafe_allow_html=True)
+        # 💡 這裡已經為你改成「本日受理英雄榜」！
+        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本日受理英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
