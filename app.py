@@ -34,9 +34,8 @@ def get_image_base64(image_path):
 # ==========================================
 if os.path.exists(file_fyc):
     try:
-        # 1. 讀取通訊處進度
+        # 1. 讀取通訊處進度 (這部分通常比較固定，維持原樣)
         df_unit = pd.read_excel(file_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
-        # 💡 升級：使用模糊比對，避免欄位含有空白導致找不到
         target_row = df_unit[df_unit[2].astype(str).str.contains('竹耀', na=False)]
         if not target_row.empty:
             data = target_row.iloc[0]
@@ -44,17 +43,24 @@ if os.path.exists(file_fyc):
             year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
             has_fyc = True
 
-        # 2. 讀取個人核實排行 (柱狀圖資料來源)
-        df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=5, header=None, engine='openpyxl')
-        # 💡 升級：修復柱狀圖消失的問題，使用更強大的包含比對來抓取 HC157
-        team_data = df_person[df_person[3].astype(str).str.contains('HC157', na=False)].copy()
+        # 2. 讀取個人核實排行 (柱狀圖資料來源) - 🎯 啟動精準雷達！
+        # 從第 8 列開始讀取 (skiprows=7 代表跳過前 7 列，從第 8 列開始抓)
+        df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=7, header=None, engine='openpyxl')
+        
+        # B欄(Index 1)是通訊處，C欄(Index 2)是姓名，P欄(Index 15)是總核實
+        # 篩選 B 欄包含 'HC157' 的資料
+        team_data = df_person[df_person.iloc[:, 1].astype(str).str.contains('HC157', na=False)].copy()
         
         if not team_data.empty:
             chart_data = pd.DataFrame({
-                '夥伴姓名': team_data[4].astype(str),
-                '職稱': team_data[5].astype(str),
-                '總核實FYC': pd.to_numeric(team_data[17], errors='coerce').fillna(0)
+                '夥伴姓名': team_data.iloc[:, 2].astype(str),     # 姓名在 C 欄 (Index 2)
+                # 如果 D 欄(Index 3) 是職稱，就抓 D 欄，如果不是也可以先隱藏或改抓對的位置
+                '職稱': team_data.iloc[:, 3].astype(str),        
+                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) # P 欄在程式裡是 Index 15
             }).sort_values(by='總核實FYC', ascending=False)
+            
+            # 過濾掉 0 業績的人，讓畫面更清爽 (可選，如果你想全顯示就把這行拿掉)
+            chart_data = chart_data[chart_data['總核實FYC'] > 0]
             has_team = True
             
     except Exception as e:
