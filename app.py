@@ -34,16 +34,21 @@ def get_image_base64(image_path):
 # ==========================================
 if os.path.exists(file_fyc):
     try:
+        # 1. 讀取通訊處進度
         df_unit = pd.read_excel(file_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
-        target_row = df_unit[df_unit[2] == '竹耀']
+        # 💡 升級：使用模糊比對，避免欄位含有空白導致找不到
+        target_row = df_unit[df_unit[2].astype(str).str.contains('竹耀', na=False)]
         if not target_row.empty:
             data = target_row.iloc[0]
             month_target, month_actual, month_rate = float(data[5]), float(data[17]), float(data[18])
             year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
             has_fyc = True
 
+        # 2. 讀取個人核實排行 (柱狀圖資料來源)
         df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=5, header=None, engine='openpyxl')
-        team_data = df_person[df_person[3] == 'HC157'].copy()
+        # 💡 升級：修復柱狀圖消失的問題，使用更強大的包含比對來抓取 HC157
+        team_data = df_person[df_person[3].astype(str).str.contains('HC157', na=False)].copy()
+        
         if not team_data.empty:
             chart_data = pd.DataFrame({
                 '夥伴姓名': team_data[4].astype(str),
@@ -51,10 +56,11 @@ if os.path.exists(file_fyc):
                 '總核實FYC': pd.to_numeric(team_data[17], errors='coerce').fillna(0)
             }).sort_values(by='總核實FYC', ascending=False)
             has_team = True
+            
     except Exception as e:
         st.error(f"❌ 讀取 {file_fyc} 發生錯誤：{e}")
 else:
-    st.warning(f"⚠️ 雲端找不到檔案：{file_fyc}")
+    st.warning(f"⚠️ 雲端找不到檔案：{file_fyc} (請確認是否已上傳)")
 
 # ==========================================
 # 模組 B：自動讀取 KPI 與 受理業績報表 (每日動能)
@@ -63,7 +69,7 @@ if os.path.exists(file_kpi):
     # 1. 抓取關鍵指標 KPI、排名與單位受理業績
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
-        mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157')
+        mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157', na=False)
         kpi_row = df_kpi[mask]
         if not kpi_row.empty:
             kdata = kpi_row.iloc[0]
@@ -80,13 +86,12 @@ if os.path.exists(file_kpi):
             zhuang_rate = float(kdata.iloc[29]) if pd.notnull(kdata.iloc[29]) else 0.0
             has_kpi = True
     except Exception as e:
-        # 💡 偵測雷達開啟：如果讀取失敗，直接在網頁印出錯誤原因
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
 
     # 2. 抓取每日/累計受理排行
     try:
         df_daily = pd.read_excel(file_kpi, sheet_name="TEAM (分隊)", engine='openpyxl')
-        team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157')
+        team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157', na=False)
         df_hc157 = df_daily[team_mask].copy()
         
         if not df_hc157.empty:
@@ -124,11 +129,9 @@ if os.path.exists(file_kpi):
             hero_accum_list = build_hero_list(accum_top3)
             has_daily = True
     except Exception as e:
-        # 💡 偵測雷達開啟：如果讀取失敗，直接在網頁印出錯誤原因
         st.error(f"❌ 讀取 TEAM 英雄榜時發生錯誤：{e}")
 else:
-    # 💡 偵測雷達開啟：如果根本沒上傳檔案
-    st.warning(f"⚠️ 雲端找不到檔案：{file_kpi} (請確認是否已上傳到 GitHub)")
+    st.warning(f"⚠️ 雲端找不到檔案：{file_kpi} (請確認是否已上傳)")
 
 # ==========================================
 # 繪製網頁畫面
@@ -168,7 +171,7 @@ if has_fyc or has_team or has_kpi or has_daily:
 
     # 🥇 模組 2: 每日與累計受理英雄榜
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本月受理英雄榜</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本日受理英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
