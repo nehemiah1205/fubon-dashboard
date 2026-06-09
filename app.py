@@ -19,7 +19,7 @@ hero_daily_list, hero_accum_list = [], []
 unit_daily_fyc = 0.0
 unit_accum_fyc = 0.0
 
-# 🛠️ 圖片轉碼器：把圖片轉成雲端能讀懂的 Base64 代碼
+# 🛠️ 圖片轉碼器
 def get_image_base64(image_path):
     try:
         with open(image_path, "rb") as img_file:
@@ -29,12 +29,28 @@ def get_image_base64(image_path):
     except Exception:
         return None
 
+# 🛠️ 數字清洗濾網：專門對付富邦亂七八糟的百分比格式
+def clean_pct(val):
+    if pd.isna(val):
+        return 0.0
+    if isinstance(val, str):
+        # 如果是字串 "48.8%"，把 % 拔掉然後除以 100 變回小數點
+        v = val.replace('%', '').replace(',', '').strip()
+        try:
+            return float(v) / 100.0
+        except:
+            return 0.0
+    try:
+        return float(val)
+    except:
+        return 0.0
+
 # ==========================================
 # 模組 A：自動讀取 FYC 核實報表 (最終戰果)
 # ==========================================
 if os.path.exists(file_fyc):
     try:
-        # 1. 讀取通訊處進度 (這部分通常比較固定，維持原樣)
+        # 1. 讀取通訊處進度
         df_unit = pd.read_excel(file_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
         target_row = df_unit[df_unit[2].astype(str).str.contains('竹耀', na=False)]
         if not target_row.empty:
@@ -43,23 +59,17 @@ if os.path.exists(file_fyc):
             year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
             has_fyc = True
 
-        # 2. 讀取個人核實排行 (柱狀圖資料來源) - 🎯 啟動精準雷達！
-        # 從第 8 列開始讀取 (skiprows=7 代表跳過前 7 列，從第 8 列開始抓)
+        # 2. 讀取個人核實排行
         df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=7, header=None, engine='openpyxl')
-        
-        # B欄(Index 1)是通訊處，C欄(Index 2)是姓名，P欄(Index 15)是總核實
-        # 篩選 B 欄包含 'HC157' 的資料
-        team_data = df_person[df_person.iloc[:, 1].astype(str).str.contains('HC157', na=False)].copy()
+        team_data = df_person[df_person[3].astype(str).str.contains('HC157', na=False)].copy()
         
         if not team_data.empty:
             chart_data = pd.DataFrame({
-                '夥伴姓名': team_data.iloc[:, 2].astype(str),     # 姓名在 C 欄 (Index 2)
-                # 如果 D 欄(Index 3) 是職稱，就抓 D 欄，如果不是也可以先隱藏或改抓對的位置
+                '夥伴姓名': team_data.iloc[:, 2].astype(str),     
                 '職稱': team_data.iloc[:, 3].astype(str),        
-                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) # P 欄在程式裡是 Index 15
+                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) 
             }).sort_values(by='總核實FYC', ascending=False)
             
-            # 過濾掉 0 業績的人，讓畫面更清爽 (可選，如果你想全顯示就把這行拿掉)
             chart_data = chart_data[chart_data['總核實FYC'] > 0]
             has_team = True
             
@@ -72,7 +82,6 @@ else:
 # 模組 B：自動讀取 KPI 與 受理業績報表 (每日動能)
 # ==========================================
 if os.path.exists(file_kpi):
-    # 1. 抓取關鍵指標 KPI、排名與單位受理業績
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
         mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157', na=False)
@@ -86,15 +95,17 @@ if os.path.exists(file_kpi):
                 
             unit_daily_fyc = float(kdata.iloc[3]) if pd.notnull(kdata.iloc[3]) else 0.0
             unit_accum_fyc = float(kdata.iloc[4]) if pd.notnull(kdata.iloc[4]) else 0.0
-            fyc_rate = float(kdata.iloc[5]) if pd.notnull(kdata.iloc[5]) else 0.0
-            ju_rate = float(kdata.iloc[13]) if pd.notnull(kdata.iloc[13]) else 0.0
-            shi_rate = float(kdata.iloc[21]) if pd.notnull(kdata.iloc[21]) else 0.0
-            zhuang_rate = float(kdata.iloc[29]) if pd.notnull(kdata.iloc[29]) else 0.0
+            
+            # 使用清洗濾網來抓取 F, N, V, AD 欄位 (對應 Index 5, 13, 21, 29)
+            fyc_rate = clean_pct(kdata.iloc[5])
+            ju_rate = clean_pct(kdata.iloc[13])
+            shi_rate = clean_pct(kdata.iloc[21])
+            zhuang_rate = clean_pct(kdata.iloc[29])
+            
             has_kpi = True
     except Exception as e:
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
 
-    # 2. 抓取每日/累計受理排行
     try:
         df_daily = pd.read_excel(file_kpi, sheet_name="TEAM (分隊)", engine='openpyxl')
         team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157', na=False)
@@ -145,7 +156,10 @@ else:
 if has_fyc or has_team or has_kpi or has_daily:
     st.success("✅ 戰情資料已自動更新至最新版！")
     
-    # 🎯 模組 1: 單位戰力與關鍵指標
+    st.markdown("### 🎯 本週業績動能預報")
+    st.link_button("📝 點此回報本週預估新增 FYC", "https://forms.gle/7vL5Xw9RQJepSwVP8", use_container_width=True)
+    st.divider()
+    
     if has_kpi:
         st.markdown("### 🎯 單位戰力與關鍵指標")
         
@@ -165,17 +179,16 @@ if has_fyc or has_team or has_kpi or has_daily:
         with r1_col3:
             st.markdown(big_metric_card("📈 累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#d93025"), unsafe_allow_html=True)
         with r1_col4:
-            st.markdown(big_metric_card("🎯 FYC 達成率", f"{fyc_rate * 100:.2f}%", "#34a853"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("🎯 FYC 達成率", f"{fyc_rate * 100:.1f}%", "#34a853"), unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
         r2_col1, r2_col2, r2_col3 = st.columns(3)
-        r2_col1.metric("舉績率", f"{ju_rate * 100:.2f}%")
-        r2_col2.metric("實動率", f"{shi_rate * 100:.2f}%")
-        r2_col3.metric("壯實人力率", f"{zhuang_rate * 100:.2f}%")
+        r2_col1.metric("舉績率", f"{ju_rate * 100:.1f}%")
+        r2_col2.metric("實動率", f"{shi_rate * 100:.1f}%")
+        r2_col3.metric("壯實人力率", f"{zhuang_rate * 100:.1f}%")
         st.divider()
 
-    # 🥇 模組 2: 每日與累計受理英雄榜
     if has_daily:
         st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本日受理英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
@@ -221,7 +234,6 @@ if has_fyc or has_team or has_kpi or has_daily:
                 render_heroes(hero_accum_list, "累計受理 (FYC)")
         st.divider()
 
-    # 📊 模組 3: FYC 核實達成進度
     if has_fyc:
         st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
         col_m, col_y = st.columns(2)
@@ -229,18 +241,17 @@ if has_fyc or has_team or has_kpi or has_daily:
             c1, c2, c3 = st.columns(3)
             c1.metric("當月目標", f"{month_target:,.2f} 萬")
             c2.metric("總核實 FYC", f"{month_actual:,.2f} 萬")
-            c3.metric("核實達成率", f"{month_rate * 100:.2f}%")
+            c3.metric("核實達成率", f"{month_rate * 100:.1f}%")
             st.progress(min(month_actual / month_target, 1.0) if month_target > 0 else 0)
 
         with col_y:
             c4, c5, c6 = st.columns(3)
             c4.metric("累計目標", f"{year_target:,.2f} 萬")
             c5.metric("累計核實 FYC", f"{year_actual:,.2f} 萬")
-            c6.metric("累計達成率", f"{year_rate * 100:.2f}%")
+            c6.metric("累計達成率", f"{year_rate * 100:.1f}%")
             st.progress(min(year_actual / year_target, 1.0) if year_target > 0 else 0)
         st.divider()
 
-    # 👥 模組 4: 個人核實業績排行榜 (進階 Altair 圖表)
     if has_team:
         st.markdown("### 👥 上月核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
