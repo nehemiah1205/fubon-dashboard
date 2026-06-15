@@ -29,12 +29,11 @@ def get_image_base64(image_path):
     except Exception:
         return None
 
-# 🛠️ 數字清洗濾網：專門對付富邦亂七八糟的百分比格式
+# 🛠️ 數字清洗濾網
 def clean_pct(val):
     if pd.isna(val):
         return 0.0
     if isinstance(val, str):
-        # 如果是字串 "48.8%"，把 % 拔掉然後除以 100 變回小數點
         v = val.replace('%', '').replace(',', '').strip()
         try:
             return float(v) / 100.0
@@ -50,16 +49,15 @@ def clean_pct(val):
 # ==========================================
 if os.path.exists(file_fyc):
     try:
-        # 1. 讀取通訊處進度
         df_unit = pd.read_excel(file_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
-        target_row = df_unit[df_unit[2].astype(str).str.contains('竹耀', na=False)]
+        # FYC 報表可能包含單位名稱或主管名稱，這裡我們用 HC157 作為主要防線
+        target_row = df_unit[df_unit.apply(lambda r: r.astype(str).str.contains('HC157').any(), axis=1)]
         if not target_row.empty:
             data = target_row.iloc[0]
             month_target, month_actual, month_rate = float(data[5]), float(data[17]), float(data[18])
             year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
             has_fyc = True
 
-        # 2. 讀取個人核實排行
         df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=7, header=None, engine='openpyxl')
         team_data = df_person[df_person[3].astype(str).str.contains('HC157', na=False)].copy()
         
@@ -84,8 +82,17 @@ else:
 if os.path.exists(file_kpi):
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
-        mask = df_kpi.iloc[:, 1].astype(str).str.contains('HC157', na=False)
-        kpi_row = df_kpi[mask]
+        
+        # 🎯 終極精準雷達：雙重身分核對 (必須是 HC157，且整列包含主管「王新智」，完美避開子分隊)
+        mask_hc157 = df_kpi.iloc[:, 1].astype(str).str.contains('HC157', na=False)
+        mask_manager = df_kpi.apply(lambda r: r.astype(str).str.contains('王新智').any(), axis=1)
+        
+        kpi_row = df_kpi[mask_hc157 & mask_manager]
+        
+        if kpi_row.empty:
+            # 若發生例外，退一步找「精確等於」HC157 的那一列
+            kpi_row = df_kpi[df_kpi.iloc[:, 1].astype(str).str.strip() == 'HC157']
+            
         if not kpi_row.empty:
             kdata = kpi_row.iloc[0]
             try:
@@ -96,7 +103,6 @@ if os.path.exists(file_kpi):
             unit_daily_fyc = float(kdata.iloc[3]) if pd.notnull(kdata.iloc[3]) else 0.0
             unit_accum_fyc = float(kdata.iloc[4]) if pd.notnull(kdata.iloc[4]) else 0.0
             
-            # 使用清洗濾網來抓取 F, N, V, AD 欄位 (對應 Index 5, 13, 21, 29)
             fyc_rate = clean_pct(kdata.iloc[5])
             ju_rate = clean_pct(kdata.iloc[13])
             shi_rate = clean_pct(kdata.iloc[21])
@@ -108,6 +114,8 @@ if os.path.exists(file_kpi):
 
     try:
         df_daily = pd.read_excel(file_kpi, sheet_name="TEAM (分隊)", engine='openpyxl')
+        
+        # 這裡的 contains 是對的，因為我們要抓底下所有子單位的夥伴
         team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157', na=False)
         df_hc157 = df_daily[team_mask].copy()
         
