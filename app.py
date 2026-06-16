@@ -49,7 +49,6 @@ def clean_pct(val):
 # ==========================================
 if os.path.exists(file_fyc):
     try:
-        # 1. 讀取通訊處進度
         df_unit = pd.read_excel(file_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
         target_row = df_unit[df_unit.apply(lambda r: r.astype(str).str.contains('HC157').any(), axis=1)]
         if not target_row.empty:
@@ -58,17 +57,14 @@ if os.path.exists(file_fyc):
             year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
             has_fyc = True
 
-        # 2. 讀取個人核實排行 (柱狀圖資料來源)
         df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=7, header=None, engine='openpyxl')
-        
-        # 🎯 修正點：精準鎖定 B 欄 (Index 1) 包含 HC157 的夥伴！
         team_data = df_person[df_person[1].astype(str).str.contains('HC157', na=False)].copy()
         
         if not team_data.empty:
             chart_data = pd.DataFrame({
-                '夥伴姓名': team_data.iloc[:, 2].astype(str),     # C 欄 (Index 2)
-                '職稱': team_data.iloc[:, 3].astype(str),        # D 欄 (Index 3)
-                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) # P 欄 (Index 15)
+                '夥伴姓名': team_data.iloc[:, 2].astype(str),     
+                '職稱': team_data.iloc[:, 3].astype(str),        
+                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) 
             }).sort_values(by='總核實FYC', ascending=False)
             
             chart_data = chart_data[chart_data['總核實FYC'] > 0]
@@ -86,26 +82,36 @@ if os.path.exists(file_kpi):
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
         
-        # 🎯 修正點：直接全表鎖定主管姓名「王新智」，抓取專屬於總處的唯一橫列
-        kpi_row = df_kpi[df_kpi.apply(lambda r: r.astype(str).str.contains('王新智').any(), axis=1)]
+        # 📡 雷達 A：專抓「上方 FYC 指標」 (鎖定 HC157 單位總計列)
+        mask_hc157_exact = df_kpi.iloc[:, 1].astype(str).str.strip() == 'HC157'
+        kpi_row_fyc = df_kpi[mask_hc157_exact]
+        if kpi_row_fyc.empty: # 備用方案
+            kpi_row_fyc = df_kpi[df_kpi.iloc[:, 1].astype(str).str.contains('HC157', na=False)]
             
-        if not kpi_row.empty:
-            kdata = kpi_row.iloc[0]
+        if not kpi_row_fyc.empty:
+            kdata_fyc = kpi_row_fyc.iloc[0]
             try:
-                fyc_rank = int(float(kdata.iloc[0]))
+                fyc_rank = int(float(kdata_fyc.iloc[0]))
             except:
                 fyc_rank = "-"
-                
-            unit_daily_fyc = float(kdata.iloc[3]) if pd.notnull(kdata.iloc[3]) else 0.0
-            unit_accum_fyc = float(kdata.iloc[4]) if pd.notnull(kdata.iloc[4]) else 0.0
-            
-            # 精準對應 F, N, V, AD 欄位 (Index 5, 13, 21, 29)
-            fyc_rate = clean_pct(kdata.iloc[5])
-            ju_rate = clean_pct(kdata.iloc[13])
-            shi_rate = clean_pct(kdata.iloc[21])
-            zhuang_rate = clean_pct(kdata.iloc[29])
-            
+            unit_daily_fyc = float(kdata_fyc.iloc[3]) if pd.notnull(kdata_fyc.iloc[3]) else 0.0
+            unit_accum_fyc = float(kdata_fyc.iloc[4]) if pd.notnull(kdata_fyc.iloc[4]) else 0.0
+            fyc_rate = clean_pct(kdata_fyc.iloc[5])
             has_kpi = True
+
+        # 📡 雷達 B：專抓「下方 人力機率指標」 (鎖定 王新智 主管列)
+        kpi_row_manpower = df_kpi[df_kpi.apply(lambda r: r.astype(str).str.contains('王新智').any(), axis=1)]
+        if not kpi_row_manpower.empty:
+            kdata_manpower = kpi_row_manpower.iloc[0]
+            ju_rate = clean_pct(kdata_manpower.iloc[13])
+            shi_rate = clean_pct(kdata_manpower.iloc[21])
+            zhuang_rate = clean_pct(kdata_manpower.iloc[29])
+        else:
+            # 如果萬一找不到主管名字，備用抓取原本的 HC157 列
+            ju_rate = clean_pct(kdata_fyc.iloc[13]) if not kpi_row_fyc.empty else 0.0
+            shi_rate = clean_pct(kdata_fyc.iloc[21]) if not kpi_row_fyc.empty else 0.0
+            zhuang_rate = clean_pct(kdata_fyc.iloc[29]) if not kpi_row_fyc.empty else 0.0
+            
     except Exception as e:
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
 
