@@ -49,8 +49,8 @@ def clean_pct(val):
 # ==========================================
 if os.path.exists(file_fyc):
     try:
+        # 1. 讀取通訊處進度
         df_unit = pd.read_excel(file_fyc, sheet_name="當期通訊處排名-FYC", skiprows=5, header=None, engine='openpyxl')
-        # FYC 報表可能包含單位名稱或主管名稱，這裡我們用 HC157 作為主要防線
         target_row = df_unit[df_unit.apply(lambda r: r.astype(str).str.contains('HC157').any(), axis=1)]
         if not target_row.empty:
             data = target_row.iloc[0]
@@ -58,14 +58,17 @@ if os.path.exists(file_fyc):
             year_target, year_actual, year_rate = float(data[6]), float(data[27]), float(data[28])
             has_fyc = True
 
+        # 2. 讀取個人核實排行 (柱狀圖資料來源)
         df_person = pd.read_excel(file_fyc, sheet_name="個人排名_FYC", skiprows=7, header=None, engine='openpyxl')
-        team_data = df_person[df_person[3].astype(str).str.contains('HC157', na=False)].copy()
+        
+        # 🎯 修正點：精準鎖定 B 欄 (Index 1) 包含 HC157 的夥伴！
+        team_data = df_person[df_person[1].astype(str).str.contains('HC157', na=False)].copy()
         
         if not team_data.empty:
             chart_data = pd.DataFrame({
-                '夥伴姓名': team_data.iloc[:, 2].astype(str),     
-                '職稱': team_data.iloc[:, 3].astype(str),        
-                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) 
+                '夥伴姓名': team_data.iloc[:, 2].astype(str),     # C 欄 (Index 2)
+                '職稱': team_data.iloc[:, 3].astype(str),        # D 欄 (Index 3)
+                '總核實FYC': pd.to_numeric(team_data.iloc[:, 15], errors='coerce').fillna(0) # P 欄 (Index 15)
             }).sort_values(by='總核實FYC', ascending=False)
             
             chart_data = chart_data[chart_data['總核實FYC'] > 0]
@@ -83,15 +86,8 @@ if os.path.exists(file_kpi):
     try:
         df_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", engine='openpyxl')
         
-        # 🎯 終極精準雷達：雙重身分核對 (必須是 HC157，且整列包含主管「王新智」，完美避開子分隊)
-        mask_hc157 = df_kpi.iloc[:, 1].astype(str).str.contains('HC157', na=False)
-        mask_manager = df_kpi.apply(lambda r: r.astype(str).str.contains('王新智').any(), axis=1)
-        
-        kpi_row = df_kpi[mask_hc157 & mask_manager]
-        
-        if kpi_row.empty:
-            # 若發生例外，退一步找「精確等於」HC157 的那一列
-            kpi_row = df_kpi[df_kpi.iloc[:, 1].astype(str).str.strip() == 'HC157']
+        # 🎯 修正點：直接全表鎖定主管姓名「王新智」，抓取專屬於總處的唯一橫列
+        kpi_row = df_kpi[df_kpi.apply(lambda r: r.astype(str).str.contains('王新智').any(), axis=1)]
             
         if not kpi_row.empty:
             kdata = kpi_row.iloc[0]
@@ -103,6 +99,7 @@ if os.path.exists(file_kpi):
             unit_daily_fyc = float(kdata.iloc[3]) if pd.notnull(kdata.iloc[3]) else 0.0
             unit_accum_fyc = float(kdata.iloc[4]) if pd.notnull(kdata.iloc[4]) else 0.0
             
+            # 精準對應 F, N, V, AD 欄位 (Index 5, 13, 21, 29)
             fyc_rate = clean_pct(kdata.iloc[5])
             ju_rate = clean_pct(kdata.iloc[13])
             shi_rate = clean_pct(kdata.iloc[21])
@@ -114,8 +111,6 @@ if os.path.exists(file_kpi):
 
     try:
         df_daily = pd.read_excel(file_kpi, sheet_name="TEAM (分隊)", engine='openpyxl')
-        
-        # 這裡的 contains 是對的，因為我們要抓底下所有子單位的夥伴
         team_mask = df_daily.iloc[:, 1].astype(str).str.contains('HC157', na=False)
         df_hc157 = df_daily[team_mask].copy()
         
