@@ -128,9 +128,8 @@ if os.path.exists(file_kpi):
             
             individuals.iloc[:, 2] = individuals.iloc[:, 2].astype(str).str.replace(' ', '').str.strip()
             individuals.iloc[:, 5] = pd.to_numeric(individuals.iloc[:, 5], errors='coerce').fillna(0)  # 當日FYC
-            individuals.iloc[:, 6] = pd.to_numeric(individuals.iloc[:, 6], errors='coerce').fillna(0)  # 當日件數
+            individuals.iloc[:, 6] = pd.to_numeric(individuals.iloc[:, 6], errors='coerce').fillna(0)  # 累計受理件數
             individuals.iloc[:, 7] = pd.to_numeric(individuals.iloc[:, 7], errors='coerce').fillna(0)  # 累計FYC
-            individuals.iloc[:, 8] = pd.to_numeric(individuals.iloc[:, 8], errors='coerce').fillna(0)  # 累計件數
             
             daily_active = individuals[individuals.iloc[:, 5] > 0]
             daily_top3 = daily_active.sort_values(by=individuals.columns[5], ascending=False).head(3)
@@ -163,7 +162,7 @@ if os.path.exists(file_kpi):
             monthly_rank_data = pd.DataFrame({
                 '夥伴姓名': individuals.iloc[:, 2].astype(str),
                 '職稱': individuals.iloc[:, 3].astype(str),
-                '累計受理件數': individuals.iloc[:, 8],
+                '累計受理件數': individuals.iloc[:, 6],
                 '累計受理FYC': individuals.iloc[:, 7],
             }).sort_values(by='累計受理FYC', ascending=False)
             has_monthly_rank = True
