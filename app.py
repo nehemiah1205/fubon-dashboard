@@ -15,9 +15,11 @@ file_fyc = "data_fyc.xlsx"
 file_kpi = "data_kpi.xlsm"
 
 has_fyc, has_team, has_kpi, has_daily = False, False, False, False
+has_monthly_rank = False
 hero_daily_list, hero_accum_list = [], []
 unit_daily_fyc = 0.0
 unit_accum_fyc = 0.0
+monthly_rank_data = pd.DataFrame()
 
 # 🛠️ 圖片轉碼器
 def get_image_base64(image_path):
@@ -125,8 +127,10 @@ if os.path.exists(file_kpi):
             individuals = df_hc157[valid_title_mask].copy()
             
             individuals.iloc[:, 2] = individuals.iloc[:, 2].astype(str).str.replace(' ', '').str.strip()
-            individuals.iloc[:, 5] = pd.to_numeric(individuals.iloc[:, 5], errors='coerce').fillna(0)
-            individuals.iloc[:, 7] = pd.to_numeric(individuals.iloc[:, 7], errors='coerce').fillna(0)
+            individuals.iloc[:, 5] = pd.to_numeric(individuals.iloc[:, 5], errors='coerce').fillna(0)  # 當日FYC
+            individuals.iloc[:, 6] = pd.to_numeric(individuals.iloc[:, 6], errors='coerce').fillna(0)  # 當日件數
+            individuals.iloc[:, 7] = pd.to_numeric(individuals.iloc[:, 7], errors='coerce').fillna(0)  # 累計FYC
+            individuals.iloc[:, 8] = pd.to_numeric(individuals.iloc[:, 8], errors='coerce').fillna(0)  # 累計件數
             
             daily_active = individuals[individuals.iloc[:, 5] > 0]
             daily_top3 = daily_active.sort_values(by=individuals.columns[5], ascending=False).head(3)
@@ -154,6 +158,15 @@ if os.path.exists(file_kpi):
             hero_daily_list = build_hero_list(daily_top3)
             hero_accum_list = build_hero_list(accum_top3)
             has_daily = True
+
+            # 📊 本月受理排行榜（全員，含掛零，資料來源同 TEAM 分頁）
+            monthly_rank_data = pd.DataFrame({
+                '夥伴姓名': individuals.iloc[:, 2].astype(str),
+                '職稱': individuals.iloc[:, 3].astype(str),
+                '累計受理件數': individuals.iloc[:, 8],
+                '累計受理FYC': individuals.iloc[:, 7],
+            }).sort_values(by='累計受理FYC', ascending=False)
+            has_monthly_rank = True
     except Exception as e:
         st.error(f"❌ 讀取 TEAM 英雄榜時發生錯誤：{e}")
 else:
@@ -241,6 +254,21 @@ if has_fyc or has_team or has_kpi or has_daily:
                 """, unsafe_allow_html=True)
             else:
                 render_heroes(hero_accum_list, "累計受理 (FYC)")
+        st.divider()
+
+    if has_monthly_rank:
+        st.markdown("### 📊 本月受理排行榜")
+        col_chart_m, col_table_m = st.columns([2, 1])
+        with col_chart_m:
+            chart_monthly = alt.Chart(monthly_rank_data).mark_bar(color='#34a853').encode(
+                x=alt.X('夥伴姓名', sort='-y', axis=alt.Axis(labelAngle=0)),
+                y=alt.Y('累計受理FYC', title='累計受理FYC'),
+                tooltip=['夥伴姓名', '職稱', '累計受理件數', '累計受理FYC']
+            ).properties(height=400)
+            st.altair_chart(chart_monthly, use_container_width=True)
+
+        with col_table_m:
+            st.dataframe(monthly_rank_data, hide_index=True, use_container_width=True)
         st.divider()
 
     if has_fyc:
