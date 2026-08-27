@@ -330,7 +330,7 @@ if os.path.exists(file_kpi):
             accum_active = individuals[individuals.iloc[:, 7] > 0]
             accum_top3 = accum_active.sort_values(by=individuals.columns[7], ascending=False).head(3)
             
-            def build_hero_list(df_top):
+            def build_hero_list(df_top, value_col):
                 medals = [("ti-medal", "金牌", "#C4A576"), ("ti-medal-2", "銀牌", "#A9BFC8"), ("ti-award", "銅牌", "#B98072")]
                 result = []
                 for i, (_, row) in enumerate(df_top.iterrows()):
@@ -343,12 +343,12 @@ if os.path.exists(file_kpi):
                     icon, label, medal_color = medals[i]
                     result.append({
                         'icon': icon, 'label': label, 'medal_color': medal_color, 'name': name, 'title': str(row.iloc[3]),
-                        'photo_src': img_src, 'value': row.iloc[5] if df_top.equals(daily_top3) else row.iloc[7]
+                        'photo_src': img_src, 'value': row.iloc[value_col]
                     })
                 return result
             
-            hero_daily_list = build_hero_list(daily_top3)
-            hero_accum_list = build_hero_list(accum_top3)
+            hero_daily_list = build_hero_list(daily_top3, 5)
+            hero_accum_list = build_hero_list(accum_top3, 7)
             has_daily = True
 
             # 📊 本月受理排行榜（全員，含掛零，資料來源同 TEAM 分頁）
