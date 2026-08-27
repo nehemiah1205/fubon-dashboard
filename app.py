@@ -2,12 +2,18 @@ import streamlit as st
 import pandas as pd
 import os
 import base64
+import re
 import altair as alt
 
 # ==========================================
 # 網頁基本設定
 # ==========================================
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
+
+def _flat(html):
+    """把多行 HTML 字串壓成單行，避免 Streamlit 的 markdown 解析器
+    把換行內容誤判成純文字直接印在畫面上。"""
+    return re.sub(r'\n\s*', '', html)
 
 # ==========================================
 # 🎨 莫蘭迪藍 淺色主題
@@ -179,7 +185,7 @@ hr {
 }
 </style>
 """
-st.markdown(MORANDI_CSS, unsafe_allow_html=True)
+st.markdown(_flat(MORANDI_CSS), unsafe_allow_html=True)
 
 # 🛠️ 圖片轉碼器
 def get_image_base64(image_path):
@@ -197,7 +203,7 @@ if _logo_src:
 else:
     _header_badge = '<div class="icon-badge"><i class="ti ti-chart-infographic"></i></div>'
 
-st.markdown(f"""
+st.markdown(_flat(f"""
 <div class="morandi-page-header">
     {_header_badge}
     <div class="titles">
@@ -205,7 +211,7 @@ st.markdown(f"""
         <p>WARROOM · 業績即時戰情看板</p>
     </div>
 </div>
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 # 設定要自動讀取的檔案名稱
 file_fyc = "data_fyc.xlsx"
@@ -372,7 +378,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.markdown('<div class="morandi-section-title"><i class="ti ti-target-arrow"></i><span>單位戰力與關鍵指標</span></div>', unsafe_allow_html=True)
         
         def big_metric_card(icon, title, value, color):
-            return f"""
+            return _flat(f"""
             <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 20px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: {color}1a; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
                     <i class="ti {icon}" style="font-size: 22px; color: {color};"></i>
@@ -380,7 +386,7 @@ if has_fyc or has_team or has_kpi or has_daily:
                 <p style="font-size: 1em; color: #83949A; margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
                 <h1 style="color: {color}; font-size: 2.4em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
             </div>
-            """
+            """)
 
         r1_col1, r1_col2, r1_col3, r1_col4 = st.columns(4)
         with r1_col1:
@@ -410,7 +416,7 @@ if has_fyc or has_team or has_kpi or has_daily:
                 if i < len(hero_list):
                     hero = hero_list[i]
                     with col:
-                        st.markdown(f"""
+                        st.markdown(_flat(f"""
                         <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 15px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
                             <div style="display:inline-flex; align-items:center; gap:6px; background:{hero['medal_color']}1a; color:{hero['medal_color']}; padding:4px 12px; border-radius:20px; font-weight:700; font-size:0.9em;">
                                 <i class="ti {hero['icon']}"></i>{hero['label']}
@@ -424,29 +430,29 @@ if has_fyc or has_team or has_kpi or has_daily:
                             <p style="font-size: 1.2em; color: #3E4A50;">{label}</p>
                             <h1 style="color: #B98072; font-size: 2.5em; margin-top: -15px;">{hero['value']:,.0f}</h1>
                         </div>
-                        """, unsafe_allow_html=True)
+                        """), unsafe_allow_html=True)
                         
         with tab1:
             if not hero_daily_list:
-                st.markdown("""
+                st.markdown(_flat("""
                 <div style="text-align: center; padding: 50px; background-color: #FFFFFF; border-radius: 14px; border: 2px dashed #DCE6E8;">
                     <i class="ti ti-hourglass-empty" style="font-size: 40px; color: #A9BFC8;"></i>
                     <h2 style="color: #83949A; margin-top: 12px;">今日尚未有夥伴報件</h2>
                     <p style="color: #A9BFC8; font-size: 1.2em;">全體準備中，等待首件捷報！💪</p>
                 </div>
-                """, unsafe_allow_html=True)
+                """), unsafe_allow_html=True)
             else:
                 render_heroes(hero_daily_list, "今日受理 (FYC)")
                 
         with tab2:
             if not hero_accum_list:
-                st.markdown("""
+                st.markdown(_flat("""
                 <div style="text-align: center; padding: 50px; background-color: #FFFFFF; border-radius: 14px; border: 2px dashed #DCE6E8;">
                     <i class="ti ti-hourglass-empty" style="font-size: 40px; color: #A9BFC8;"></i>
                     <h2 style="color: #83949A; margin-top: 12px;">本月尚未有夥伴報件</h2>
                     <p style="color: #A9BFC8; font-size: 1.2em;">大家繼續努力，創造佳績！💪</p>
                 </div>
-                """, unsafe_allow_html=True)
+                """), unsafe_allow_html=True)
             else:
                 render_heroes(hero_accum_list, "累計受理 (FYC)")
         st.divider()
