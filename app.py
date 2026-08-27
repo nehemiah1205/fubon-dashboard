@@ -13,6 +13,9 @@ st.set_page_config(page_title="竹耀戰情室", layout="wide")
 # 🎨 莫蘭迪藍 淺色主題
 # ==========================================
 MORANDI_CSS = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root {
     --morandi-bg-top: #F1F5F6;
@@ -29,6 +32,10 @@ MORANDI_CSS = """
     --morandi-text-soft: #83949A;
 }
 
+html, body, [class*="css"] {
+    font-family: 'Noto Sans TC', sans-serif !important;
+}
+
 .stApp {
     background: linear-gradient(180deg, var(--morandi-bg-top) 0%, var(--morandi-bg-bottom) 100%);
 }
@@ -42,9 +49,61 @@ h1, h2, h3 {
     font-weight: 700 !important;
 }
 
-.morandi-hero-title {
-    text-align: center;
-    letter-spacing: 2px;
+.morandi-page-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 0 20px;
+}
+.morandi-page-header .icon-badge {
+    width: 54px;
+    height: 54px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--morandi-blue) 0%, var(--morandi-blue-deep) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(81,112,125,0.22);
+    flex-shrink: 0;
+}
+.morandi-page-header .icon-badge i {
+    font-size: 28px;
+    color: #ffffff;
+}
+.morandi-page-header .titles h1 {
+    margin: 0 !important;
+    font-size: 1.9em !important;
+    color: var(--morandi-text) !important;
+}
+.morandi-page-header .titles p {
+    margin: 2px 0 0;
+    color: var(--morandi-text-soft);
+    font-size: 0.95em;
+    letter-spacing: 1px;
+}
+
+.morandi-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 16px;
+}
+.morandi-section-title i {
+    font-size: 20px;
+    color: var(--morandi-blue-deep);
+    background: #EAF0F1;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.morandi-section-title span {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: var(--morandi-blue-deep);
+    letter-spacing: 0.5px;
 }
 
 hr {
@@ -122,7 +181,31 @@ hr {
 """
 st.markdown(MORANDI_CSS, unsafe_allow_html=True)
 
-st.title("🚀 竹耀戰情儀表板")
+# 🛠️ 圖片轉碼器
+def get_image_base64(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            encoded_string = base64.b64encode(img_file.read()).decode()
+            ext = "jpeg" if image_path.lower().endswith(".jpg") else "png"
+            return f"data:image/{ext};base64,{encoded_string}"
+    except Exception:
+        return None
+
+_logo_src = get_image_base64("logo.png")
+if _logo_src:
+    _header_badge = f'<img src="{_logo_src}" style="width:54px;height:54px;border-radius:16px;object-fit:cover;box-shadow:0 6px 16px rgba(81,112,125,0.22);flex-shrink:0;">'
+else:
+    _header_badge = '<div class="icon-badge"><i class="ti ti-chart-infographic"></i></div>'
+
+st.markdown(f"""
+<div class="morandi-page-header">
+    {_header_badge}
+    <div class="titles">
+        <h1>竹耀戰情儀表板</h1>
+        <p>WARROOM · 業績即時戰情看板</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # 設定要自動讀取的檔案名稱
 file_fyc = "data_fyc.xlsx"
@@ -134,16 +217,6 @@ hero_daily_list, hero_accum_list = [], []
 unit_daily_fyc = 0.0
 unit_accum_fyc = 0.0
 monthly_rank_data = pd.DataFrame()
-
-# 🛠️ 圖片轉碼器
-def get_image_base64(image_path):
-    try:
-        with open(image_path, "rb") as img_file:
-            encoded_string = base64.b64encode(img_file.read()).decode()
-            ext = "jpeg" if image_path.lower().endswith(".jpg") else "png"
-            return f"data:image/{ext};base64,{encoded_string}"
-    except Exception:
-        return None
 
 # 🛠️ 數字清洗濾網
 def clean_pct(val):
@@ -252,7 +325,7 @@ if os.path.exists(file_kpi):
             accum_top3 = accum_active.sort_values(by=individuals.columns[7], ascending=False).head(3)
             
             def build_hero_list(df_top):
-                medal_colors = ["🥇 金牌", "🥈 銀牌", "🥉 銅牌"]
+                medals = [("ti-medal", "金牌", "#C4A576"), ("ti-medal-2", "銀牌", "#A9BFC8"), ("ti-award", "銅牌", "#B98072")]
                 result = []
                 for i, (_, row) in enumerate(df_top.iterrows()):
                     name = str(row.iloc[2])
@@ -261,9 +334,9 @@ if os.path.exists(file_kpi):
                         img_src = get_image_base64(f"{name}.png")
                     elif os.path.exists(f"{name}.jpg"):
                         img_src = get_image_base64(f"{name}.jpg")
-                        
+                    icon, label, medal_color = medals[i]
                     result.append({
-                        'rank': medal_colors[i], 'name': name, 'title': str(row.iloc[3]),
+                        'icon': icon, 'label': label, 'medal_color': medal_color, 'name': name, 'title': str(row.iloc[3]),
                         'photo_src': img_src, 'value': row.iloc[5] if df_top.equals(daily_top3) else row.iloc[7]
                     })
                 return result
@@ -291,30 +364,33 @@ else:
 if has_fyc or has_team or has_kpi or has_daily:
     st.success("✅ 戰情資料已自動更新至最新版！")
     
-    st.markdown("### 🎯 本週業績動能預報")
+    st.markdown('<div class="morandi-section-title"><i class="ti ti-calendar-stats"></i><span>本週業績動能預報</span></div>', unsafe_allow_html=True)
     st.link_button("📝 點此回報本週預估新增 FYC", "https://forms.gle/7vL5Xw9RQJepSwVP8", use_container_width=True)
     st.divider()
     
     if has_kpi:
-        st.markdown("### 🎯 單位戰力與關鍵指標")
+        st.markdown('<div class="morandi-section-title"><i class="ti ti-target-arrow"></i><span>單位戰力與關鍵指標</span></div>', unsafe_allow_html=True)
         
-        def big_metric_card(title, value, color):
+        def big_metric_card(icon, title, value, color):
             return f"""
             <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 20px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
-                <p style="font-size: 1.1em; color: #83949A; margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
-                <h1 style="color: {color}; font-size: 2.6em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: {color}1a; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
+                    <i class="ti {icon}" style="font-size: 22px; color: {color};"></i>
+                </div>
+                <p style="font-size: 1em; color: #83949A; margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
+                <h1 style="color: {color}; font-size: 2.4em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
             </div>
             """
 
         r1_col1, r1_col2, r1_col3, r1_col4 = st.columns(4)
         with r1_col1:
-            st.markdown(big_metric_card("🏆 通訊處排名", f"第 {fyc_rank} 名", "#C4A576"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("ti-trophy", "通訊處排名", f"第 {fyc_rank} 名", "#C4A576"), unsafe_allow_html=True)
         with r1_col2:
-            st.markdown(big_metric_card("🔥 單日受理 FYC", f"{unit_daily_fyc:,.0f}", "#7C97A3"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("ti-flame", "單日受理 FYC", f"{unit_daily_fyc:,.0f}", "#7C97A3"), unsafe_allow_html=True)
         with r1_col3:
-            st.markdown(big_metric_card("📈 累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#B98072"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("ti-trending-up", "累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#B98072"), unsafe_allow_html=True)
         with r1_col4:
-            st.markdown(big_metric_card("🎯 FYC 達成率", f"{fyc_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("ti-target", "FYC 達成率", f"{fyc_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -325,7 +401,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.divider()
 
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #C4A576;'>🏆 本日受理英雄榜</h2>", unsafe_allow_html=True)
+        st.markdown('<div class="morandi-section-title" style="justify-content:center;"><i class="ti ti-trophy" style="background:#F7EFE1;color:#C4A576;"></i><span>本日受理英雄榜</span></div>', unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
@@ -336,8 +412,12 @@ if has_fyc or has_team or has_kpi or has_daily:
                     with col:
                         st.markdown(f"""
                         <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 15px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
-                            <h3 style="color: #C4A576;">{hero['rank']}</h3>
-                            <img src="{hero['photo_src']}" width="150" height="150" style="border-radius: 50%; object-fit: cover; box-shadow: 0 4px 8px rgba(81,112,125,0.15); border: 3px solid #E4EBED;">
+                            <div style="display:inline-flex; align-items:center; gap:6px; background:{hero['medal_color']}1a; color:{hero['medal_color']}; padding:4px 12px; border-radius:20px; font-weight:700; font-size:0.9em;">
+                                <i class="ti {hero['icon']}"></i>{hero['label']}
+                            </div>
+                            <div>
+                                <img src="{hero['photo_src']}" width="150" height="150" style="border-radius: 50%; object-fit: cover; box-shadow: 0 4px 8px rgba(81,112,125,0.15); border: 3px solid #E4EBED; margin-top: 12px;">
+                            </div>
                             <h2 style="margin-top: 15px; color: #51707D;">{hero['name']}</h2>
                             <p style="color: #83949A; margin-top: -10px;">({hero['title']})</p>
                             <hr style="border-color: #DCE6E8;">
@@ -350,7 +430,8 @@ if has_fyc or has_team or has_kpi or has_daily:
             if not hero_daily_list:
                 st.markdown("""
                 <div style="text-align: center; padding: 50px; background-color: #FFFFFF; border-radius: 14px; border: 2px dashed #DCE6E8;">
-                    <h2 style="color: #83949A;">⏳ 今日尚未有夥伴報件</h2>
+                    <i class="ti ti-hourglass-empty" style="font-size: 40px; color: #A9BFC8;"></i>
+                    <h2 style="color: #83949A; margin-top: 12px;">今日尚未有夥伴報件</h2>
                     <p style="color: #A9BFC8; font-size: 1.2em;">全體準備中，等待首件捷報！💪</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -361,7 +442,8 @@ if has_fyc or has_team or has_kpi or has_daily:
             if not hero_accum_list:
                 st.markdown("""
                 <div style="text-align: center; padding: 50px; background-color: #FFFFFF; border-radius: 14px; border: 2px dashed #DCE6E8;">
-                    <h2 style="color: #83949A;">⏳ 本月尚未有夥伴報件</h2>
+                    <i class="ti ti-hourglass-empty" style="font-size: 40px; color: #A9BFC8;"></i>
+                    <h2 style="color: #83949A; margin-top: 12px;">本月尚未有夥伴報件</h2>
                     <p style="color: #A9BFC8; font-size: 1.2em;">大家繼續努力，創造佳績！💪</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -370,7 +452,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.divider()
 
     if has_monthly_rank:
-        st.markdown("### 📊 本月受理排行榜")
+        st.markdown('<div class="morandi-section-title"><i class="ti ti-chart-bar"></i><span>本月受理排行榜</span></div>', unsafe_allow_html=True)
         col_chart_m, col_table_m = st.columns([2, 1])
         with col_chart_m:
             chart_monthly = alt.Chart(monthly_rank_data).mark_bar(color='#8FA88C').encode(
@@ -385,7 +467,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.divider()
 
     if has_fyc:
-        st.markdown("### 📊 上月核實進度總覽 (最終戰果)")
+        st.markdown('<div class="morandi-section-title"><i class="ti ti-report-analytics"></i><span>上月核實進度總覽 (最終戰果)</span></div>', unsafe_allow_html=True)
         col_m, col_y = st.columns(2)
         with col_m:
             c1, c2, c3 = st.columns(3)
@@ -403,7 +485,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.divider()
 
     if has_team:
-        st.markdown("### 👥 上月核實貢獻排行榜")
+        st.markdown('<div class="morandi-section-title"><i class="ti ti-users-group"></i><span>上月核實貢獻排行榜</span></div>', unsafe_allow_html=True)
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
             chart = alt.Chart(chart_data).mark_bar(color='#7C97A3').encode(
