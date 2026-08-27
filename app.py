@@ -8,6 +8,120 @@ import altair as alt
 # 網頁基本設定
 # ==========================================
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
+
+# ==========================================
+# 🎨 莫蘭迪藍 淺色主題
+# ==========================================
+MORANDI_CSS = """
+<style>
+:root {
+    --morandi-bg-top: #F1F5F6;
+    --morandi-bg-bottom: #E4EBED;
+    --morandi-surface: #FFFFFF;
+    --morandi-border: #DCE6E8;
+    --morandi-blue: #7C97A3;
+    --morandi-blue-deep: #51707D;
+    --morandi-blue-soft: #A9BFC8;
+    --morandi-gold: #C4A576;
+    --morandi-rose: #B98072;
+    --morandi-sage: #8FA88C;
+    --morandi-text: #3E4A50;
+    --morandi-text-soft: #83949A;
+}
+
+.stApp {
+    background: linear-gradient(180deg, var(--morandi-bg-top) 0%, var(--morandi-bg-bottom) 100%);
+}
+
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+h1, h2, h3 {
+    color: var(--morandi-blue-deep) !important;
+    font-weight: 700 !important;
+}
+
+.morandi-hero-title {
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+hr {
+    border-color: var(--morandi-border) !important;
+}
+
+/* 連結按鈕 / 按鈕 */
+.stLinkButton a, .stButton button {
+    background-color: var(--morandi-blue) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 3px 8px rgba(81, 112, 125, 0.18) !important;
+}
+.stLinkButton a:hover, .stButton button:hover {
+    background-color: var(--morandi-blue-deep) !important;
+}
+
+/* 提示框 (success / warning / error) */
+[data-testid="stAlert"] {
+    background-color: var(--morandi-surface) !important;
+    border: 1px solid var(--morandi-border) !important;
+    border-radius: 10px !important;
+    color: var(--morandi-text) !important;
+}
+
+/* st.metric */
+[data-testid="stMetric"] {
+    background-color: var(--morandi-surface);
+    border: 1px solid var(--morandi-border);
+    border-radius: 12px;
+    padding: 14px 10px;
+    box-shadow: 0 2px 6px rgba(81, 112, 125, 0.06);
+}
+[data-testid="stMetricLabel"] {
+    color: var(--morandi-text-soft) !important;
+}
+[data-testid="stMetricValue"] {
+    color: var(--morandi-blue-deep) !important;
+}
+
+/* 分頁 tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 6px;
+}
+.stTabs [data-baseweb="tab"] {
+    background-color: var(--morandi-surface);
+    border: 1px solid var(--morandi-border);
+    border-radius: 8px 8px 0 0;
+    color: var(--morandi-text-soft);
+    font-weight: 600;
+}
+.stTabs [aria-selected="true"] {
+    background-color: var(--morandi-blue) !important;
+    color: #ffffff !important;
+    border-color: var(--morandi-blue) !important;
+}
+
+/* 進度條 */
+[data-testid="stProgress"] > div > div > div {
+    background-color: var(--morandi-blue) !important;
+}
+[data-testid="stProgress"] > div > div {
+    background-color: var(--morandi-border) !important;
+}
+
+/* 表格 */
+[data-testid="stDataFrame"] {
+    border: 1px solid var(--morandi-border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+</style>
+"""
+st.markdown(MORANDI_CSS, unsafe_allow_html=True)
+
 st.title("🚀 竹耀戰情儀表板")
 
 # 設定要自動讀取的檔案名稱
@@ -186,21 +300,21 @@ if has_fyc or has_team or has_kpi or has_daily:
         
         def big_metric_card(title, value, color):
             return f"""
-            <div style="text-align: center; border: 2px solid #eee; border-radius: 10px; padding: 20px; background-color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
-                <p style="font-size: 1.2em; color: #555; margin-bottom: 5px; font-weight: bold;">{title}</p>
-                <h1 style="color: {color}; font-size: 2.8em; margin: 0; font-weight: 900; letter-spacing: 1px;">{value}</h1>
+            <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 20px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
+                <p style="font-size: 1.1em; color: #83949A; margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
+                <h1 style="color: {color}; font-size: 2.6em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
             </div>
             """
 
         r1_col1, r1_col2, r1_col3, r1_col4 = st.columns(4)
         with r1_col1:
-            st.markdown(big_metric_card("🏆 通訊處排名", f"第 {fyc_rank} 名", "#ffaa00"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("🏆 通訊處排名", f"第 {fyc_rank} 名", "#C4A576"), unsafe_allow_html=True)
         with r1_col2:
-            st.markdown(big_metric_card("🔥 單日受理 FYC", f"{unit_daily_fyc:,.0f}", "#1a73e8"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("🔥 單日受理 FYC", f"{unit_daily_fyc:,.0f}", "#7C97A3"), unsafe_allow_html=True)
         with r1_col3:
-            st.markdown(big_metric_card("📈 累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#d93025"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("📈 累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#B98072"), unsafe_allow_html=True)
         with r1_col4:
-            st.markdown(big_metric_card("🎯 FYC 達成率", f"{fyc_rate * 100:.1f}%", "#34a853"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("🎯 FYC 達成率", f"{fyc_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -211,7 +325,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.divider()
 
     if has_daily:
-        st.markdown("<h2 style='text-align: center; color: #ffcc00;'>🏆 本日受理英雄榜</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #C4A576;'>🏆 本日受理英雄榜</h2>", unsafe_allow_html=True)
         tab1, tab2 = st.tabs(["🔥 今日受理 Top 3", "📈 當月累計受理 Top 3"])
         
         def render_heroes(hero_list, label):
@@ -221,23 +335,23 @@ if has_fyc or has_team or has_kpi or has_daily:
                     hero = hero_list[i]
                     with col:
                         st.markdown(f"""
-                        <div style="text-align: center; border: 2px solid #ddd; border-radius: 10px; padding: 15px; background-color: #f9f9f9;">
-                            <h3 style="color: #333;">{hero['rank']}</h3>
-                            <img src="{hero['photo_src']}" width="150" height="150" style="border-radius: 50%; object-fit: cover; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-                            <h2 style="margin-top: 15px; color: #1a73e8;">{hero['name']}</h2>
-                            <p style="color: #666; margin-top: -10px;">({hero['title']})</p>
-                            <hr>
-                            <p style="font-size: 1.2em; color: #333;">{label}</p>
-                            <h1 style="color: #d93025; font-size: 2.5em; margin-top: -15px;">{hero['value']:,.0f}</h1>
+                        <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 15px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
+                            <h3 style="color: #C4A576;">{hero['rank']}</h3>
+                            <img src="{hero['photo_src']}" width="150" height="150" style="border-radius: 50%; object-fit: cover; box-shadow: 0 4px 8px rgba(81,112,125,0.15); border: 3px solid #E4EBED;">
+                            <h2 style="margin-top: 15px; color: #51707D;">{hero['name']}</h2>
+                            <p style="color: #83949A; margin-top: -10px;">({hero['title']})</p>
+                            <hr style="border-color: #DCE6E8;">
+                            <p style="font-size: 1.2em; color: #3E4A50;">{label}</p>
+                            <h1 style="color: #B98072; font-size: 2.5em; margin-top: -15px;">{hero['value']:,.0f}</h1>
                         </div>
                         """, unsafe_allow_html=True)
                         
         with tab1:
             if not hero_daily_list:
                 st.markdown("""
-                <div style="text-align: center; padding: 50px; background-color: #f9f9f9; border-radius: 10px; border: 2px dashed #ccc;">
-                    <h2 style="color: #666;">⏳ 今日尚未有夥伴報件</h2>
-                    <p style="color: #999; font-size: 1.2em;">全體準備中，等待首件捷報！💪</p>
+                <div style="text-align: center; padding: 50px; background-color: #FFFFFF; border-radius: 14px; border: 2px dashed #DCE6E8;">
+                    <h2 style="color: #83949A;">⏳ 今日尚未有夥伴報件</h2>
+                    <p style="color: #A9BFC8; font-size: 1.2em;">全體準備中，等待首件捷報！💪</p>
                 </div>
                 """, unsafe_allow_html=True)
             else:
@@ -246,9 +360,9 @@ if has_fyc or has_team or has_kpi or has_daily:
         with tab2:
             if not hero_accum_list:
                 st.markdown("""
-                <div style="text-align: center; padding: 50px; background-color: #f9f9f9; border-radius: 10px; border: 2px dashed #ccc;">
-                    <h2 style="color: #666;">⏳ 本月尚未有夥伴報件</h2>
-                    <p style="color: #999; font-size: 1.2em;">大家繼續努力，創造佳績！💪</p>
+                <div style="text-align: center; padding: 50px; background-color: #FFFFFF; border-radius: 14px; border: 2px dashed #DCE6E8;">
+                    <h2 style="color: #83949A;">⏳ 本月尚未有夥伴報件</h2>
+                    <p style="color: #A9BFC8; font-size: 1.2em;">大家繼續努力，創造佳績！💪</p>
                 </div>
                 """, unsafe_allow_html=True)
             else:
@@ -259,7 +373,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.markdown("### 📊 本月受理排行榜")
         col_chart_m, col_table_m = st.columns([2, 1])
         with col_chart_m:
-            chart_monthly = alt.Chart(monthly_rank_data).mark_bar(color='#34a853').encode(
+            chart_monthly = alt.Chart(monthly_rank_data).mark_bar(color='#8FA88C').encode(
                 x=alt.X('夥伴姓名', sort='-y', axis=alt.Axis(labelAngle=0)),
                 y=alt.Y('累計受理FYC', title='累計受理FYC'),
                 tooltip=['夥伴姓名', '職稱', '累計受理件數', '累計受理FYC']
@@ -292,7 +406,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.markdown("### 👥 上月核實貢獻排行榜")
         col_chart, col_table = st.columns([2, 1])
         with col_chart:
-            chart = alt.Chart(chart_data).mark_bar(color='#1a73e8').encode(
+            chart = alt.Chart(chart_data).mark_bar(color='#7C97A3').encode(
                 x=alt.X('夥伴姓名', sort='-y', axis=alt.Axis(labelAngle=0)), 
                 y=alt.Y('總核實FYC', title='總核實FYC'),
                 tooltip=['夥伴姓名', '職稱', '總核實FYC']
