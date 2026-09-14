@@ -294,19 +294,29 @@ if os.path.exists(file_kpi):
             fyc_rate = clean_pct(kdata_fyc.iloc[5])
             has_kpi = True
 
-        # 📡 雷達 B：專抓「下方 人力機率指標」 (鎖定 王新智 主管列)
-        kpi_row_manpower = df_kpi[df_kpi.apply(lambda r: r.astype(str).str.contains('王新智').any(), axis=1)]
-        if not kpi_row_manpower.empty:
-            kdata_manpower = kpi_row_manpower.iloc[0]
-            ju_rate = clean_pct(kdata_manpower.iloc[13])
-            shi_rate = clean_pct(kdata_manpower.iloc[21])
-            zhuang_rate = clean_pct(kdata_manpower.iloc[29])
-        else:
-            # 如果萬一找不到主管名字，備用抓取原本的 HC157 列
-            ju_rate = clean_pct(kdata_fyc.iloc[13]) if not kpi_row_fyc.empty else 0.0
-            shi_rate = clean_pct(kdata_fyc.iloc[21]) if not kpi_row_fyc.empty else 0.0
-            zhuang_rate = clean_pct(kdata_fyc.iloc[29]) if not kpi_row_fyc.empty else 0.0
-            
+        # 📡 雷達 B：專抓「下方 人力機率指標」
+        # 注意：舉績率／實動率／壯實率是三張各自獨立排名的小表格（欄位 8-13 / 16-21 / 24-29），
+        # HC157 在每張表格中的名次（列位置）都不一樣，不能用同一列去讀三個數字，
+        # 也不能只用「王新智」在整列搜尋（左側 FYC 總表同一列剛好也會命中，導致誤抓到別的單位的數字）。
+        # 改為：分別在每張小表格自己的「單位」欄位精準比對 HC157 所在列。
+        def find_unit_rate(unit_col, rank_col, rate_col, unit_name='HC157'):
+            col_series = df_kpi.iloc[:, unit_col].astype(str).str.strip()
+            match = df_kpi[col_series == unit_name]
+            if match.empty:
+                match = df_kpi[col_series.str.contains(unit_name, na=False)]
+            if not match.empty:
+                row = match.iloc[0]
+                try:
+                    rank = int(float(row.iloc[rank_col]))
+                except Exception:
+                    rank = "-"
+                return clean_pct(row.iloc[rate_col]), rank
+            return 0.0, "-"
+
+        ju_rate, ju_rank = find_unit_rate(unit_col=9, rank_col=8, rate_col=13)
+        shi_rate, shi_rank = find_unit_rate(unit_col=17, rank_col=16, rate_col=21)
+        zhuang_rate, zhuang_rank = find_unit_rate(unit_col=25, rank_col=24, rate_col=29)
+
     except Exception as e:
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
 
@@ -401,9 +411,9 @@ if has_fyc or has_team or has_kpi or has_daily:
         st.markdown("<br>", unsafe_allow_html=True)
         
         r2_col1, r2_col2, r2_col3 = st.columns(3)
-        r2_col1.metric("舉績率", f"{ju_rate * 100:.1f}%")
-        r2_col2.metric("實動率", f"{shi_rate * 100:.1f}%")
-        r2_col3.metric("壯實人力率", f"{zhuang_rate * 100:.1f}%")
+        r2_col1.metric("舉績率", f"{ju_rate * 100:.1f}%", help=f"通訊處排名第 {ju_rank} 名")
+        r2_col2.metric("實動率", f"{shi_rate * 100:.1f}%", help=f"通訊處排名第 {shi_rank} 名")
+        r2_col3.metric("壯實人力率", f"{zhuang_rate * 100:.1f}%", help=f"通訊處排名第 {zhuang_rank} 名")
         st.divider()
 
     if has_daily:
