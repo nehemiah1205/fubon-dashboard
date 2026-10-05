@@ -4,3 +4,5 @@ openpyxl
 altair
 exchangelib
 msoffcrypto-tool
+plotly
+xlrd

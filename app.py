@@ -4,6 +4,7 @@ import os
 import base64
 import re
 import altair as alt
+from cumulative_section import load_history, history_mtime, render_cumulative_section, today_codes
 
 # ==========================================
 # 網頁基本設定
@@ -224,6 +225,10 @@ unit_daily_fyc = 0.0
 unit_accum_fyc = 0.0
 monthly_rank_data = pd.DataFrame()
 
+# 📚 每日累積的歷史資料（由 auto_rename.py 產生）
+hist_units, hist_people, hist_policies = load_history(".", history_mtime("."))
+hist_today = hist_units["date"].max() if not hist_units.empty else None
+
 # 🛠️ 數字清洗濾網
 def clean_pct(val):
     if pd.isna(val):
@@ -353,7 +358,8 @@ if os.path.exists(file_kpi):
                     icon, label, medal_color = medals[i]
                     result.append({
                         'icon': icon, 'label': label, 'medal_color': medal_color, 'name': name, 'title': str(row.iloc[3]),
-                        'photo_src': img_src, 'value': row.iloc[value_col]
+                        'photo_src': img_src, 'value': row.iloc[value_col],
+                        'codes': today_codes(hist_policies, name, hist_today) if value_col == 5 else []
                     })
                 return result
             
@@ -425,6 +431,7 @@ if has_fyc or has_team or has_kpi or has_daily:
             for i, col in enumerate(h_cols):
                 if i < len(hero_list):
                     hero = hero_list[i]
+                    codes_html = "".join('<span class="cum-code">' + c + '</span>' for c in hero.get('codes', []))
                     with col:
                         st.markdown(_flat(f"""
                         <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 15px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
@@ -436,6 +443,7 @@ if has_fyc or has_team or has_kpi or has_daily:
                             </div>
                             <h2 style="margin-top: 15px; color: #51707D;">{hero['name']}</h2>
                             <p style="color: #83949A; margin-top: -10px;">({hero['title']})</p>
+                            {codes_html}
                             <hr style="border-color: #DCE6E8;">
                             <p style="font-size: 1.2em; color: #3E4A50;">{label}</p>
                             <h1 style="color: #B98072; font-size: 2.5em; margin-top: -15px;">{hero['value']:,.0f}</h1>
@@ -465,6 +473,11 @@ if has_fyc or has_team or has_kpi or has_daily:
                 """), unsafe_allow_html=True)
             else:
                 render_heroes(hero_accum_list, "累計受理 (FYC)")
+        st.divider()
+
+    # 📈 本月累積走勢（每日報件同仁、險種、商品分布、小組進度、單位達成率）
+    if not hist_units.empty:
+        render_cumulative_section(hist_units, hist_people, hist_policies)
         st.divider()
 
     if has_monthly_rank:
