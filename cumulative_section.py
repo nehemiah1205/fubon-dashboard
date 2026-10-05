@@ -2,9 +2,9 @@
 竹耀戰情室：本月累積業績走勢區塊
 
 資料來源：auto_rename.py 每天累積的三個 CSV
-  history_units.csv     區部各單位每日累計（含目標、舉績／實動／壯實）
+  history_units.csv     竹耀每日累計（含目標、舉績／實動／壯實）
   history_people.csv    本單位每位同仁每日件數與 FYC（含所屬小組）
-  history_policies.csv  本單位每件保單的年期險種（來自競賽檔）
+  history_policies.csv  本單位每件保單的年期險種（來自個人險當）
 
 在 app.py 中：
     from cumulative_section import load_history, render_cumulative_section, today_codes
@@ -106,6 +106,10 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
     u_hist = units[(units["unit"] == unit) & units["date"].between(rs, re_)].sort_values("date")
     p_hist = people[(people["unit"] == unit) & people["date"].between(rs, re_)] if not people.empty else people
     pol = policies[(policies["unit"] == unit) & policies["date"].between(rs, re_)] if not policies.empty else policies
+    # 已匯入商品資料的日子（含「當天沒有保單」的標記列），再拿掉標記列
+    pol_dates = set(pol["date"]) if not pol.empty else set()
+    if not pol.empty:
+        pol = pol[pol["name"].notna() & pol["code"].notna() & (pol["name"].astype(str) != "")]
     if u_hist.empty:
         st.info(f"本工作月還沒有 {unit} 的資料")
         return
@@ -139,8 +143,10 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
         return m.sort_values(["df", "dc"], ascending=False)
 
     def codes_of(d, name):
-        if pol.empty or d not in set(pol["date"]):
+        if d not in pol_dates:
             return None
+        if pol.empty:
+            return []
         return pol[(pol["date"] == d) & (pol["name"].map(_norm) == _norm(name))]["code"].tolist()
 
     hover = []
@@ -156,7 +162,7 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
             lines.append("<i>當天沒有報件</i>")
         for row in dp.head(10).itertuples():
             codes = codes_of(d, row.name)
-            ctxt = "、".join(codes) if codes else ("競賽檔無此件" if codes == [] else "")
+            ctxt = "、".join(codes) if codes else ("險當無此件" if codes == [] else "")
             lines.append(f"<b>{row.name}</b>（{row.team or '—'}） {row.dc:.0f} 件 · {row.df:,.0f}"
                          + (f"<br>　　{ctxt}" if ctxt else ""))
         if len(dp) > 10:
@@ -209,7 +215,7 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
         if not dp.empty:
             tbl = pd.DataFrame({
                 "同仁": dp["name"], "小組": dp["team"].replace("", "—"),
-                "商品": [("、".join(c) if c else ("競賽檔無此件" if c == [] else "未匯入競賽檔"))
+                "商品": [("、".join(c) if c else ("險當無此件" if c == [] else "未匯入險當"))
                          for c in (codes_of(picked, n) for n in dp["name"])],
                 "件數": dp["dc"].astype(int), "受理 FYC": dp["df"],
             })
@@ -231,21 +237,21 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
     st.markdown("<br>", unsafe_allow_html=True)
     _section("ti-packages", "本月商品分布")
     if pol.empty:
-        st.caption("還沒有競賽檔的保單資料")
+        st.caption("還沒有個人險當的保單資料")
     else:
         pol = pol.assign(險種=pol["code"].str.replace(r"^\d+", "", regex=True).replace("", pd.NA).fillna(pol["code"]))
-        dist = (pol.groupby("險種").agg(件數=("n", "sum"), 競賽FYC=("fyc", "sum"),
+        dist = (pol.groupby("險種").agg(件數=("n", "sum"), FYC=("fyc", "sum"),
                                         年期=("code", lambda s: "、".join(f"{c}×{k}" for c, k in s.value_counts().items())))
-                .sort_values(["件數", "競賽FYC"], ascending=False).reset_index())
+                .sort_values(["件數", "FYC"], ascending=False).reset_index())
         dist["件數"] = dist["件數"].astype(int)
-        st.markdown(f'<div class="cum-note">{"、".join(_md(d) for d in sorted(pol["date"].unique()))} 競賽檔 · '
-                    f'{int(pol["n"].sum())} 件、{len(dist)} 種險種 · 競賽 FYC 與受理 FYC 計算口徑不同，僅供商品比較</div>',
+        st.markdown(f'<div class="cum-note">{"、".join(_md(d) for d in sorted(pol["date"].unique()))} 個人險當 · '
+                    f'{int(pol["n"].sum())} 件、{len(dist)} 種險種</div>',
                     unsafe_allow_html=True)
         d1, d2 = st.columns([1, 1.1])
         with d1:
             st.dataframe(dist, hide_index=True, **WIDE, column_config={
                 "件數": st.column_config.ProgressColumn("件數", format="%d 件", min_value=0, max_value=float(dist["件數"].max())),
-                "競賽FYC": st.column_config.NumberColumn("競賽 FYC", format="%,d"),
+                "FYC": st.column_config.NumberColumn("FYC", format="%,d"),
                 "年期": st.column_config.TextColumn("年期險種")})
         with d2:
             pick = st.selectbox("看誰賣了這個險種", dist["險種"].tolist(), key=f"{key}_prod")
@@ -254,8 +260,8 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
             st.dataframe(pd.DataFrame({
                 "日期": who["date"].map(_md), "同仁": who["name"],
                 "小組": who["name"].map(lambda n: team_map.get(_norm(n)) or "—"),
-                "年期險種": who["code"], "競賽 FYC": who["fyc"],
-            }), hide_index=True, **WIDE, column_config={"競賽 FYC": st.column_config.NumberColumn(format="%,d")})
+                "年期險種": who["code"], "FYC": who["fyc"],
+            }), hide_index=True, **WIDE, column_config={"FYC": st.column_config.NumberColumn(format="%,d")})
 
     # 尚未舉績
     if not p_hist.empty:
@@ -269,27 +275,3 @@ def render_cumulative_section(units: pd.DataFrame, people: pd.DataFrame, policie
             st.markdown('<div class="cum-chips">' + "".join(
                 f'<span>{r.name}<em>{r.team or ""}</em></span>' for r in zero.itertuples()) + "</div>",
                 unsafe_allow_html=True)
-
-    # 區部單位達成率
-    st.markdown("<br>", unsafe_allow_html=True)
-    _section("ti-building-community", "竹苗區部 單位達成率")
-    board = lu[lu["rank_in_grp"].notna() & (lu["target"] > 0)].copy()
-    board["rate"] = board["cf"] / board["target"]
-    board = board.sort_values("rate")
-    pos = list(board.sort_values("rate", ascending=False)["unit"]).index(unit) + 1 if unit in set(board["unit"]) else None
-    if pos:
-        st.markdown(f'<div class="cum-note">{unit} 目前第 <b>{pos}</b>/{len(board)} 名 · 紅色虛線為時間進度 {pace * 100:.1f}%</div>',
-                    unsafe_allow_html=True)
-    bf = go.Figure(go.Bar(
-        x=board["rate"], y=board["unit"], orientation="h",
-        marker_color=[GOLD if u == unit else BLUE_SOFT for u in board["unit"]],
-        text=[f"{r * 100:.1f}%" for r in board["rate"]], textposition="outside",
-        customdata=board[["mgr", "cf", "target"]].values,
-        hovertemplate="<b>%{y}</b> %{customdata[0]}<br>累計 FYC %{customdata[1]:,.0f} / 目標 %{customdata[2]:,.0f}<extra></extra>"))
-    bf.add_vline(x=pace, line=dict(color=ROSE, dash="dash", width=1.5))
-    bf.update_layout(height=max(320, 26 * len(board) + 40), margin=dict(l=10, r=40, t=10, b=10),
-                     plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                     font=dict(family="Noto Sans TC, sans-serif", color=TEXT),
-                     xaxis=dict(tickformat=".0%", gridcolor=BORDER, range=[0, max(board["rate"].max(), pace) * 1.15]),
-                     yaxis=dict(tickfont=dict(color=TEXT)), dragmode=False)
-    st.plotly_chart(bf, **WIDE, config={"displayModeBar": False}, key=f"{key}_units")
