@@ -11,58 +11,6 @@ from cumulative_section import load_history, history_mtime, render_cumulative_se
 # ==========================================
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
 
-# ==========================================
-# 🔒 資安：進入前先輸入通行密碼
-# 密碼放在 Streamlit Cloud 的 Secrets（APP_PASSWORD），不寫在程式或 GitHub 裡
-# ==========================================
-import hmac
-import time
-
-def require_login():
-    if st.session_state.get("auth_ok"):
-        return
-    try:
-        secret = st.secrets.get("APP_PASSWORD", "")
-    except Exception:
-        secret = ""
-    if not secret:
-        st.error("🔒 戰情室尚未設定通行密碼，暫停開放。請管理者在 Streamlit Cloud 的 Secrets 設定 APP_PASSWORD。")
-        st.stop()
-
-    locked_until = st.session_state.get("locked_until", 0)
-    st.markdown("<div style='max-width:420px;margin:12vh auto 0;text-align:center'>"
-                "<h2 style='color:#51707D'>竹耀戰情室</h2>"
-                "<p style='color:#83949A'>內部業績資料，僅限竹耀夥伴瀏覽</p></div>", unsafe_allow_html=True)
-    _, mid, _ = st.columns([1, 1.2, 1])
-    with mid:
-        if time.time() < locked_until:
-            st.error(f"密碼錯誤太多次，請 {int((locked_until - time.time()) // 60) + 1} 分鐘後再試。")
-            st.stop()
-        with st.form("login"):
-            pw = st.text_input("通行密碼", type="password")
-            ok = st.form_submit_button("進入戰情室", use_container_width=True)
-        if ok:
-            if hmac.compare_digest(pw.encode(), str(secret).encode()):
-                st.session_state["auth_ok"] = True
-                st.session_state["fails"] = 0
-                st.rerun()
-            fails = st.session_state.get("fails", 0) + 1
-            st.session_state["fails"] = fails
-            if fails >= 5:
-                st.session_state["locked_until"] = time.time() + 600
-                st.session_state["fails"] = 0
-                st.error("密碼錯誤太多次，已暫停 10 分鐘。")
-            else:
-                st.error(f"密碼不正確（還可以再試 {5 - fails} 次）")
-    st.stop()
-
-require_login()
-
-with st.sidebar:
-    if st.button("登出"):
-        st.session_state["auth_ok"] = False
-        st.rerun()
-
 def _flat(html):
     """把多行 HTML 字串壓成單行，避免 Streamlit 的 markdown 解析器
     把換行內容誤判成純文字直接印在畫面上。"""
@@ -255,6 +203,7 @@ if _logo_src:
     _header_badge = f'<img src="{_logo_src}" style="width:54px;height:54px;border-radius:16px;object-fit:cover;box-shadow:0 6px 16px rgba(81,112,125,0.22);flex-shrink:0;">'
 else:
     _header_badge = '<div class="icon-badge"><i class="ti ti-chart-infographic"></i></div>'
+
 
 st.markdown(_flat(f"""
 <div class="morandi-page-header">
