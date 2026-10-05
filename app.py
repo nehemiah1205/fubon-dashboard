@@ -11,6 +11,58 @@ from cumulative_section import load_history, history_mtime, render_cumulative_se
 # ==========================================
 st.set_page_config(page_title="竹耀戰情室", layout="wide")
 
+# ==========================================
+# 🔒 資安：進入前先輸入通行密碼
+# 密碼放在 Streamlit Cloud 的 Secrets（APP_PASSWORD），不寫在程式或 GitHub 裡
+# ==========================================
+import hmac
+import time
+
+def require_login():
+    if st.session_state.get("auth_ok"):
+        return
+    try:
+        secret = st.secrets.get("APP_PASSWORD", "")
+    except Exception:
+        secret = ""
+    if not secret:
+        st.error("🔒 戰情室尚未設定通行密碼，暫停開放。請管理者在 Streamlit Cloud 的 Secrets 設定 APP_PASSWORD。")
+        st.stop()
+
+    locked_until = st.session_state.get("locked_until", 0)
+    st.markdown("<div style='max-width:420px;margin:12vh auto 0;text-align:center'>"
+                "<h2 style='color:#51707D'>竹耀戰情室</h2>"
+                "<p style='color:#83949A'>內部業績資料，僅限竹耀夥伴瀏覽</p></div>", unsafe_allow_html=True)
+    _, mid, _ = st.columns([1, 1.2, 1])
+    with mid:
+        if time.time() < locked_until:
+            st.error(f"密碼錯誤太多次，請 {int((locked_until - time.time()) // 60) + 1} 分鐘後再試。")
+            st.stop()
+        with st.form("login"):
+            pw = st.text_input("通行密碼", type="password")
+            ok = st.form_submit_button("進入戰情室", use_container_width=True)
+        if ok:
+            if hmac.compare_digest(pw.encode(), str(secret).encode()):
+                st.session_state["auth_ok"] = True
+                st.session_state["fails"] = 0
+                st.rerun()
+            fails = st.session_state.get("fails", 0) + 1
+            st.session_state["fails"] = fails
+            if fails >= 5:
+                st.session_state["locked_until"] = time.time() + 600
+                st.session_state["fails"] = 0
+                st.error("密碼錯誤太多次，已暫停 10 分鐘。")
+            else:
+                st.error(f"密碼不正確（還可以再試 {5 - fails} 次）")
+    st.stop()
+
+require_login()
+
+with st.sidebar:
+    if st.button("登出"):
+        st.session_state["auth_ok"] = False
+        st.rerun()
+
 def _flat(html):
     """把多行 HTML 字串壓成單行，避免 Streamlit 的 markdown 解析器
     把換行內容誤判成純文字直接印在畫面上。"""
@@ -318,9 +370,24 @@ if os.path.exists(file_kpi):
                 return clean_pct(row.iloc[rate_col]), rank
             return 0.0, "-"
 
-        ju_rate, ju_rank = find_unit_rate(unit_col=9, rank_col=8, rate_col=13)
-        shi_rate, shi_rank = find_unit_rate(unit_col=17, rank_col=16, rate_col=21)
-        zhuang_rate, zhuang_rank = find_unit_rate(unit_col=25, rank_col=24, rate_col=29)
+        # 每個月報表可能多出新的區塊（例如 10 月起多了 CSM），所以依表頭文字找出各小表格的起始欄，
+        # 每張小表格的排列都是：名次、單位、單位主管、…、比率（起始欄 + 5）
+        raw_kpi = pd.read_excel(file_kpi, sheet_name="關鍵指標 (分隊)", header=None, engine='openpyxl')
+        def block_start(keyword):
+            for _, r in raw_kpi.head(8).iterrows():
+                for ci, v in enumerate(r):
+                    if pd.notna(v) and keyword in re.sub(r"\s", "", str(v)):
+                        return ci
+            return None
+        def rate_of(keyword):
+            c = block_start(keyword)
+            if c is None:
+                return 0.0, "-"
+            return find_unit_rate(unit_col=c + 1, rank_col=c, rate_col=c + 5)
+
+        ju_rate, ju_rank = rate_of("舉績率")
+        shi_rate, shi_rank = rate_of("實動率")
+        zhuang_rate, zhuang_rank = rate_of("壯實人力率")
 
     except Exception as e:
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
