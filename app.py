@@ -436,15 +436,61 @@ if has_fyc or has_team or has_kpi or has_daily:
     if has_kpi:
         st.markdown('<div class="morandi-section-title"><i class="ti ti-target-arrow"></i><span>單位戰力與關鍵指標</span></div>', unsafe_allow_html=True)
         
-        def big_metric_card(icon, title, value, color, sub=""):
+        # ⏱️ 時間進度：工作月內第幾個工作天（週一到週五）
+        pace = None
+        try:
+            if not hist_units.empty:
+                _last = hist_units.sort_values("date").iloc[-1]
+                _days = pd.bdate_range(_last["range_start"], _last["range_end"])
+                _today = kpi_day if 'kpi_day' in globals() and kpi_day is not None else _last["date"]
+                if len(_days):
+                    pace = max(1, int((_days <= _today).sum())) / len(_days)
+        except Exception:
+            pace = None
+
+        GOLD = "#C4A576"
+
+        def rate_bar(rate, color, rank=None):
+            """樣式 A：按比例填色的進度條＋時間進度紅線＋超前／落後說明。"""
+            fill = max(0.0, min(rate, 1.0)) * 100
+            bar_color = GOLD if rate >= 1 else color
+            pace_line = (f'<span style="position:absolute;top:-4px;bottom:-4px;left:calc({pace * 100:.1f}% - 1px);'
+                         f'width:2px;background:#B98072;"></span>') if pace is not None else ""
+            notes = []
+            if rank not in (None, "-"):
+                notes.append(f"通訊處第 {rank} 名")
+            if pace is not None:
+                gap = (rate - pace) * 100
+                notes.append(f"{'超前' if gap >= 0 else '落後'}時間進度 {abs(gap):.1f} 個百分點")
+            return (f'<div style="position:relative;height:10px;border-radius:6px;background:#E7EEF0;margin-top:12px;">'
+                    f'<span style="position:absolute;left:0;top:0;bottom:0;width:{fill:.1f}%;border-radius:6px;background:{bar_color};"></span>'
+                    f'{pace_line}</div>'
+                    f'<p style="font-size:0.82em;color:#83949A;margin:6px 0 0;min-height:1.3em;">{" · ".join(notes)}</p>')
+
+        # 沒有進度條的卡片放同樣高度的空白，整排才會對齊
+        BAR_SPACER = '<div style="height:10px;margin-top:12px;"></div><p style="font-size:0.82em;margin:6px 0 0;min-height:1.3em;">&nbsp;</p>'
+
+        def big_metric_card(icon, title, value, color, rate=None, rank=None):
+            bar = rate_bar(rate, color, rank) if rate is not None else BAR_SPACER
+            value_color = GOLD if (rate is not None and rate >= 1) else color
             return _flat(f"""
             <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 20px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: {color}1a; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
                     <i class="ti {icon}" style="font-size: 22px; color: {color};"></i>
                 </div>
                 <p style="font-size: 1em; color: #83949A; margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
-                <h1 style="color: {color}; font-size: 2.4em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
-                {f'<p style="font-size: 0.9em; color: #83949A; margin: 6px 0 0;">{sub}</p>' if sub else ''}
+                <h1 style="color: {value_color}; font-size: 2.4em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
+                <div style="text-align: left;">{bar}</div>
+            </div>
+            """)
+
+        def small_rate_card(title, rate, color, rank):
+            value_color = GOLD if rate >= 1 else color
+            return _flat(f"""
+            <div style="border: 1px solid #DCE6E8; border-radius: 12px; padding: 14px 18px; background-color: #FFFFFF; box-shadow: 0 2px 6px rgba(81,112,125,0.06);">
+                <p style="font-size: 0.95em; color: #83949A; margin: 0 0 2px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
+                <p style="font-size: 2em; color: {value_color}; margin: 0; font-weight: 700; line-height: 1.25;">{rate * 100:.1f}%</p>
+                {rate_bar(rate, color, rank)}
             </div>
             """)
 
@@ -456,7 +502,7 @@ if has_fyc or has_team or has_kpi or has_daily:
         with r1_col3:
             st.markdown(big_metric_card("ti-trending-up", "累計受理 FYC", f"{unit_accum_fyc:,.0f}", "#B98072"), unsafe_allow_html=True)
         with r1_col4:
-            st.markdown(big_metric_card("ti-target", "FYC 達成率", f"{fyc_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
+            st.markdown(big_metric_card("ti-target", "FYC 達成率", f"{fyc_rate * 100:.1f}%", "#8FA88C", rate=fyc_rate), unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -470,13 +516,13 @@ if has_fyc or has_team or has_kpi or has_daily:
             with c_col3:
                 st.markdown(big_metric_card("ti-stack-2", "累計受理 CSM", f"{csm_accum:,.0f}", "#B98072"), unsafe_allow_html=True)
             with c_col4:
-                st.markdown(big_metric_card("ti-chart-donut", "CSM 達成率", f"{csm_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
+                st.markdown(big_metric_card("ti-chart-donut", "CSM 達成率", f"{csm_rate * 100:.1f}%", "#8FA88C", rate=csm_rate), unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
 
         r2_col1, r2_col2, r2_col3 = st.columns(3)
-        r2_col1.metric("舉績率", f"{ju_rate * 100:.1f}%", help=f"通訊處排名第 {ju_rank} 名")
-        r2_col2.metric("實動率", f"{shi_rate * 100:.1f}%", help=f"通訊處排名第 {shi_rank} 名")
-        r2_col3.metric("壯實人力率", f"{zhuang_rate * 100:.1f}%", help=f"通訊處排名第 {zhuang_rank} 名")
+        r2_col1.markdown(small_rate_card("舉績率", ju_rate, "#C4A576", ju_rank), unsafe_allow_html=True)
+        r2_col2.markdown(small_rate_card("實動率", shi_rate, "#B98072", shi_rank), unsafe_allow_html=True)
+        r2_col3.markdown(small_rate_card("壯實人力率", zhuang_rate, "#51707D", zhuang_rank), unsafe_allow_html=True)
         st.divider()
 
     if has_daily:
