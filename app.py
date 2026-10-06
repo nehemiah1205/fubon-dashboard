@@ -338,6 +338,33 @@ if os.path.exists(file_kpi):
         shi_rate, shi_rank = rate_of("實動率")
         zhuang_rate, zhuang_rank = rate_of("壯實人力率")
 
+        # 📡 雷達 C：CSM 達成率（10 月起新增的區塊：名次、單位、主管、當日、累計 CSM、達成率）
+        has_csm = False
+        c_csm = block_start("CSM達成率")
+        if c_csm is not None:
+            unit_col = raw_kpi.iloc[:, c_csm + 1].astype(str).str.strip()
+            m_csm = raw_kpi[unit_col == 'HC157']
+            if not m_csm.empty:
+                row_csm = m_csm.iloc[0]
+                try:
+                    csm_rank = int(float(row_csm.iloc[c_csm]))
+                except Exception:
+                    csm_rank = "-"
+                csm_accum = float(row_csm.iloc[c_csm + 4]) if pd.notna(row_csm.iloc[c_csm + 4]) else 0.0
+                csm_rate = clean_pct(row_csm.iloc[c_csm + 5])
+                has_csm = True
+
+                # 報表上的「當日 CSM」欄不是金額，改用個人險當（保單明細）加總當天竹耀的換算 CSM
+                csm_daily = None
+                m_day = re.search(r"受理日[：:]\s*(\d{2,3})\.(\d{1,2})\.(\d{1,2})",
+                                  " ".join(str(v) for v in raw_kpi.head(5).values.ravel()))
+                kpi_day = (pd.Timestamp(int(m_day.group(1)) + 1911, int(m_day.group(2)), int(m_day.group(3)))
+                           if m_day else hist_today)
+                if kpi_day is not None and not hist_policies.empty and "csm" in hist_policies:
+                    day_pol = hist_policies[hist_policies["date"] == kpi_day]
+                    if not day_pol.empty:
+                        csm_daily = float(pd.to_numeric(day_pol["csm"], errors="coerce").fillna(0).sum())
+
     except Exception as e:
         st.error(f"❌ 讀取 KPI 指標時發生錯誤：{e}") 
 
@@ -409,7 +436,7 @@ if has_fyc or has_team or has_kpi or has_daily:
     if has_kpi:
         st.markdown('<div class="morandi-section-title"><i class="ti ti-target-arrow"></i><span>單位戰力與關鍵指標</span></div>', unsafe_allow_html=True)
         
-        def big_metric_card(icon, title, value, color):
+        def big_metric_card(icon, title, value, color, sub=""):
             return _flat(f"""
             <div style="text-align: center; border: 1px solid #DCE6E8; border-radius: 14px; padding: 20px; background-color: #FFFFFF; box-shadow: 0 4px 14px rgba(81,112,125,0.10);">
                 <div style="width: 44px; height: 44px; border-radius: 12px; background: {color}1a; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
@@ -417,6 +444,7 @@ if has_fyc or has_team or has_kpi or has_daily:
                 </div>
                 <p style="font-size: 1em; color: #83949A; margin-bottom: 5px; font-weight: 600; letter-spacing: 0.5px;">{title}</p>
                 <h1 style="color: {color}; font-size: 2.4em; margin: 0; font-weight: 800; letter-spacing: 1px;">{value}</h1>
+                {f'<p style="font-size: 0.9em; color: #83949A; margin: 6px 0 0;">{sub}</p>' if sub else ''}
             </div>
             """)
 
@@ -431,7 +459,20 @@ if has_fyc or has_team or has_kpi or has_daily:
             st.markdown(big_metric_card("ti-target", "FYC 達成率", f"{fyc_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        
+
+        if has_csm:
+            c_col1, c_col2, c_col3, c_col4 = st.columns(4)
+            with c_col1:
+                st.markdown(big_metric_card("ti-award", "CSM 排名", f"第 {csm_rank} 名", "#C4A576"), unsafe_allow_html=True)
+            with c_col2:
+                st.markdown(big_metric_card("ti-bolt", "單日受理 CSM",
+                                            f"{csm_daily:,.0f}" if csm_daily is not None else "—", "#7C97A3"), unsafe_allow_html=True)
+            with c_col3:
+                st.markdown(big_metric_card("ti-stack-2", "累計受理 CSM", f"{csm_accum:,.0f}", "#B98072"), unsafe_allow_html=True)
+            with c_col4:
+                st.markdown(big_metric_card("ti-chart-donut", "CSM 達成率", f"{csm_rate * 100:.1f}%", "#8FA88C"), unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+
         r2_col1, r2_col2, r2_col3 = st.columns(3)
         r2_col1.metric("舉績率", f"{ju_rate * 100:.1f}%", help=f"通訊處排名第 {ju_rank} 名")
         r2_col2.metric("實動率", f"{shi_rate * 100:.1f}%", help=f"通訊處排名第 {shi_rank} 名")
